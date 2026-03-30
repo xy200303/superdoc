@@ -10,7 +10,7 @@ import { getFileObject } from '@superdoc/common';
 import BasicUpload from '@superdoc/common/components/BasicUpload.vue';
 import SuperdocLogo from './superdoc-logo.webp?url';
 import { Editor, fieldAnnotationHelpers, getStarterExtensions } from '@superdoc/super-editor';
-import { toolbarIcons } from '../../../../super-editor/src/components/toolbar/toolbarIcons';
+import { toolbarIcons } from '../../../../super-editor/src/editors/v1/components/toolbar/toolbarIcons';
 import BlankDOCX from '@superdoc/common/data/blank.docx?url';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import SidebarSearch from './sidebar/SidebarSearch.vue';
@@ -291,16 +291,7 @@ const handleCompareFile = async (event) => {
       annotations: true,
     });
 
-    const compareDoc = compareEditor.state.doc;
-    const compareComments = compareEditor.converter?.comments ?? [];
-    const compareTranslatedLinkedStyles = compareEditor.converter?.translatedLinkedStyles;
-    const compareTranslatedNumbering = compareEditor.converter?.translatedNumbering;
-    const diff = editor.commands.compareDocuments(
-      compareDoc,
-      compareComments,
-      compareTranslatedLinkedStyles,
-      compareTranslatedNumbering,
-    );
+    const diff = editor.commands.compareDocuments(compareEditor);
     const userToApply = editor.options?.user ?? user;
     editor.commands.replayDifferences(diff, { user: userToApply, applyTrackedChanges: true });
   } finally {
@@ -741,6 +732,9 @@ const init = async () => {
         // responsiveToContainer: true,
         excludeItems: [], // ['italic', 'bold'],
         // texts: {},
+      },
+      surfaces: {
+        findReplace: true,
       },
       // Test custom context menu configuration
       contextMenu: {

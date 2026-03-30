@@ -15,7 +15,7 @@ ProseMirror Doc → pm-adapter → FlowBlock[] → layout-engine → Layout[] �
 | `contracts/` | Shared types (FlowBlock, Layout, etc.) | `src/index.ts` |
 | `pm-adapter/` | PM document → FlowBlocks conversion | `src/internal.ts` |
 | `layout-engine/` | Pagination algorithms | `src/index.ts` |
-| `layout-bridge/` | Pipeline orchestration | `src/layout-pipeline.ts` |
+| `layout-bridge/` | Layout orchestration & bridge utilities | `src/incrementalLayout.ts` |
 | `painters/dom/` | DOM rendering | `src/renderer.ts` |
 | `style-engine/` | OOXML style resolution | `src/index.ts` |
 | `geometry-utils/` | Math utilities for layout | `src/index.ts` |
@@ -114,7 +114,7 @@ Rendering logic for specific OOXML features is extracted into **feature modules*
 - `painters/dom/src/renderer.ts` - Main DOM rendering orchestrator (large file — feature logic is being extracted to `features/`)
 - `painters/dom/src/features/feature-registry.ts` - OOXML element → feature module lookup
 - `painters/dom/src/styles.ts` - CSS class definitions
-- `layout-bridge/src/layout-pipeline.ts` - Pipeline orchestration
+- `layout-bridge/src/incrementalLayout.ts` - Layout orchestration (called by PresentationEditor)
 - `pm-adapter/src/internal.ts` - PM → FlowBlock conversion
 
 ## Rendering Ownership
@@ -123,6 +123,6 @@ Rendering logic for specific OOXML features is extracted into **feature modules*
 
 - Style-resolved properties flow through: `style-engine` → `pm-adapter` (sets attrs on FlowBlocks) → `DomPainter` (renders to DOM)
 - Do NOT add ProseMirror decoration plugins for visual styling — that bypasses the rendering pipeline
-- Editing behavior (commands, keybindings) stays in `super-editor/src/extensions/`
+- Editing behavior (commands, keybindings) stays in `super-editor/src/editors/v1/extensions/`
 
 See root CLAUDE.md for full architecture.

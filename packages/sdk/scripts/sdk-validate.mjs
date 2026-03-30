@@ -121,9 +121,9 @@ async function main() {
     ]);
   });
 
-  // 2. Regenerate SDK artifacts from current contract
-  await check('SDK/codegen artifacts are current', async () => {
-    await run('node', [path.join(REPO_ROOT, 'packages/sdk/codegen/src/generate-all.mjs')]);
+  // 2. Regenerate SDK artifacts from source-backed contract export
+  await check('SDK/codegen artifacts regenerate cleanly from source', async () => {
+    await run('node', [path.join(REPO_ROOT, 'packages/sdk/scripts/sdk-generate.mjs')]);
   });
 
   // 3. Load contract and verify structure
@@ -376,7 +376,7 @@ async function main() {
   // 19. Host-platform compiled CLI smoke test
   await check('CLI compiled binary can open a document on host platform', async () => {
     const cliBinaryPath = resolveHostCliBinaryPath();
-    const sourceDocPath = path.join(REPO_ROOT, 'packages/super-editor/src/tests/data/basic-paragraph.docx');
+    const sourceDocPath = path.join(REPO_ROOT, 'packages/super-editor/src/editors/v1/tests/data/basic-paragraph.docx');
     const stateDir = await mkdtemp(path.join(tmpdir(), 'superdoc-cli-validate-'));
 
     try {
@@ -407,7 +407,7 @@ async function main() {
   // 20. Python SDK + compiled CLI integration smoke test
   await check('Python SDK can open a document via host compiled CLI binary', async () => {
     const cliBinaryPath = resolveHostCliBinaryPath();
-    const sourceDocPath = path.join(REPO_ROOT, 'packages/super-editor/src/tests/data/basic-paragraph.docx');
+    const sourceDocPath = path.join(REPO_ROOT, 'packages/super-editor/src/editors/v1/tests/data/basic-paragraph.docx');
     const stateDir = await mkdtemp(path.join(tmpdir(), 'superdoc-python-sdk-validate-'));
 
     try {

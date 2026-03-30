@@ -6,7 +6,7 @@
  * - Envelope params (session, out, force, dry-run, change-mode, expected-revision)
  * - Constraints (mutuallyExclusive, requiresOneOf) for a handful of ops
  * - Positional overrides (describeCommand)
- * - CLI-only operation metadata (10 ops)
+ * - CLI-only operation metadata
  */
 
 import {
@@ -89,6 +89,13 @@ const USER_EMAIL_PARAM: CliOperationParamSpec = {
   kind: 'flag',
   flag: 'user-email',
   type: 'string',
+};
+const PASSWORD_PARAM: CliOperationParamSpec = {
+  name: 'password',
+  kind: 'flag',
+  type: 'string',
+  description: 'Password for opening encrypted DOCX files.',
+  agentVisible: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -522,6 +529,21 @@ const TEXT_TARGET_FLAT_PARAMS_AGENT_HIDDEN: CliOperationParamSpec[] = TEXT_TARGE
   agentVisible: false as const,
 }));
 
+const SELECTION_TARGET_JSON_PARAM: CliOperationParamSpec = {
+  name: 'target',
+  kind: 'jsonFlag',
+  flag: 'target-json',
+  type: 'json',
+  description: 'Collapsed text insertion point as SelectionTarget JSON.',
+};
+
+const INSERT_REF_PARAM: CliOperationParamSpec = {
+  name: 'ref',
+  kind: 'flag',
+  type: 'string',
+  description: 'Mutation-ready ref returned by query.match or ranges.resolve.',
+};
+
 const LIST_TARGET_FLAT_PARAMS: CliOperationParamSpec[] = [
   { name: 'nodeId', kind: 'flag', flag: 'node-id', type: 'string', description: 'Node ID of the target list item.' },
 ];
@@ -587,16 +609,17 @@ const EXTRA_CLI_PARAMS: Partial<Record<string, CliOperationParamSpec[]>> = {
   ],
   // Text-range operations: flat flags (--block-id, --start, --end) as shortcuts for --target-json
   'doc.insert': [
-    ...TEXT_TARGET_FLAT_PARAMS,
+    ...TEXT_TARGET_FLAT_PARAMS_AGENT_HIDDEN,
     {
       name: 'offset',
       kind: 'flag',
       type: 'number',
       description: 'Character offset for insertion (alias for --start/--end with same value).',
+      agentVisible: false as const,
     },
   ],
-  'doc.replace': [...TEXT_TARGET_FLAT_PARAMS],
-  'doc.delete': [...TEXT_TARGET_FLAT_PARAMS],
+  'doc.replace': [...TEXT_TARGET_FLAT_PARAMS_AGENT_HIDDEN],
+  'doc.delete': [...TEXT_TARGET_FLAT_PARAMS_AGENT_HIDDEN],
   'doc.styles.apply': [
     {
       name: 'target',
@@ -1032,6 +1055,7 @@ const CLI_ONLY_METADATA: Record<CliOnlyOperationId, CliOperationMetadata> = {
       { name: 'bootstrapSettlingMs', kind: 'flag', flag: 'bootstrap-settling-ms', type: 'number' },
       USER_NAME_PARAM,
       USER_EMAIL_PARAM,
+      PASSWORD_PARAM,
     ],
     constraints: null,
   },
@@ -1053,6 +1077,54 @@ const CLI_ONLY_METADATA: Record<CliOnlyOperationId, CliOperationMetadata> = {
     docRequirement: 'none',
     params: [SESSION_PARAM, { name: 'discard', kind: 'flag', type: 'boolean' }],
     constraints: null,
+  },
+  'doc.insertTab': {
+    command: 'insert tab',
+    positionalParams: ['doc'],
+    docRequirement: 'none',
+    params: [
+      DOC_PARAM,
+      SESSION_PARAM,
+      OUT_PARAM,
+      FORCE_PARAM,
+      EXPECTED_REVISION_PARAM,
+      SELECTION_TARGET_JSON_PARAM,
+      INSERT_REF_PARAM,
+      ...TEXT_TARGET_FLAT_PARAMS,
+      {
+        name: 'offset',
+        kind: 'flag',
+        type: 'number',
+        description: 'Character offset for insertion (alias for --start/--end with the same value).',
+      },
+    ],
+    constraints: {
+      mutuallyExclusive: [['target', 'ref']],
+    },
+  },
+  'doc.insertLineBreak': {
+    command: 'insert line-break',
+    positionalParams: ['doc'],
+    docRequirement: 'none',
+    params: [
+      DOC_PARAM,
+      SESSION_PARAM,
+      OUT_PARAM,
+      FORCE_PARAM,
+      EXPECTED_REVISION_PARAM,
+      SELECTION_TARGET_JSON_PARAM,
+      INSERT_REF_PARAM,
+      ...TEXT_TARGET_FLAT_PARAMS,
+      {
+        name: 'offset',
+        kind: 'flag',
+        type: 'number',
+        description: 'Character offset for insertion (alias for --start/--end with the same value).',
+      },
+    ],
+    constraints: {
+      mutuallyExclusive: [['target', 'ref']],
+    },
   },
   'doc.status': {
     command: 'status',
