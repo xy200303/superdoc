@@ -132,6 +132,12 @@ import type {
   ProofingStatus,
   ProofingError,
 
+  // Context menu
+  ContextMenuContext,
+  ContextMenuItem,
+  ContextMenuSection,
+  ContextMenuConfig,
+
   // Other
   UnsupportedContentItem,
   PageStyles,
@@ -584,6 +590,41 @@ function testEditorContentMethods(editor: Editor) {
 }
 
 // ============================================
+// SECTION 12b: Context menu types (SD-2514)
+// ============================================
+
+function testContextMenuTypes() {
+  // action receives (editor, context) — both args
+  const item: ContextMenuItem = {
+    id: 'copy-text',
+    label: 'Copy',
+    icon: 'copy',
+    action: (editor, context) => {
+      editor.commands.selectAll();
+      const text: string = context.selectedText;
+    },
+    showWhen: (ctx) => ctx.hasSelection && !ctx.isInTable,
+  };
+
+  const section: ContextMenuSection = {
+    id: 'custom-actions',
+    items: [item],
+  };
+
+  const config: ContextMenuConfig = {
+    customItems: [section],
+    includeDefaultItems: true,
+    menuProvider: (ctx, sections) => sections.filter((s) => s.id !== 'clipboard'),
+  };
+
+  // ContextMenuContext has the full runtime shape
+  const ctx: ContextMenuContext = {} as ContextMenuContext;
+  const _trigger: 'click' | 'slash' = ctx.trigger;
+  const _mode: string = ctx.documentMode;
+  const _marks: string[] = ctx.activeMarks;
+}
+
+// ============================================
 // SECTION 13: Extensions, SuperDoc, and utilities
 // ============================================
 
@@ -679,6 +720,7 @@ export {
   testProofingProvider,
   testEditorStaticMethods,
   testEditorContentMethods,
+  testContextMenuTypes,
   testExtensions,
   testSuperDoc,
   testUtilities,
