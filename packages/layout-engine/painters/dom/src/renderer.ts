@@ -2435,7 +2435,6 @@ export class DomPainter {
 
     return separatorPositions;
   }
-
   private renderDecorationsForPage(
     pageEl: HTMLElement,
     page: Page,
