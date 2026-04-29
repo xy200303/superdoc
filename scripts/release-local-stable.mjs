@@ -567,6 +567,14 @@ function resumePackagePublish(pkg, distTag, options = {}) {
       ]);
       break;
     case 'vscode-ext':
+      // The vscode-ext webview imports `superdoc`, which resolves to
+      // packages/superdoc/dist/. The main release flow builds that via the
+      // root `Build packages` step, but recovery snapshots only run
+      // `pnpm install` and never build the workspace. Build it here so
+      // `vsce package` can bundle the webview.
+      if (!skipBuild) {
+        runInWorkspace(workspaceRoot, 'pnpm', ['run', 'build']);
+      }
       runInWorkspace(workspaceRoot, 'pnpm', ['--prefix', join(workspaceRoot, 'apps/vscode-ext'), 'run', 'package']);
       runInWorkspace(workspaceRoot, 'pnpm', ['--prefix', join(workspaceRoot, 'apps/vscode-ext'), 'run', 'publish:vsce']);
       break;
