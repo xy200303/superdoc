@@ -4,7 +4,7 @@
  * tracked-change ids — story-aware) and
  * `presentation.scrollToPositionAsync()` for text targets (body-only
  * today). Used by `ui.viewport.scrollIntoView`, `ui.comments.scrollTo`,
- * and `ui.review.scrollTo`.
+ * and `ui.trackChanges.scrollTo`.
  */
 
 import type { ScrollIntoViewInput, ScrollIntoViewOutput } from '@superdoc/document-api';
