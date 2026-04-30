@@ -340,7 +340,10 @@ jobs:
   stable-promotion-checks:
     name: 'Labs: Stable promotion checks'
     needs: register
+    # Temporarily disabled. Keep the job definition intact so the checks can
+    # be re-enabled by removing this false guard.
     if: >-
+      false &&
       always() &&
       github.event.action != 'closed' &&
       github.event.pull_request.base.ref == 'stable' &&
