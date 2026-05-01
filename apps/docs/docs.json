@@ -172,6 +172,23 @@
             ]
           },
           {
+            "group": "Bring Your Own UI",
+            "tag": "NEW",
+            "pages": [
+              "bring-your-own-ui/overview",
+              "bring-your-own-ui/react-setup",
+              {
+                "group": "Toolbar and commands",
+                "pages": ["bring-your-own-ui/toolbar-and-commands", "bring-your-own-ui/custom-commands"]
+              },
+              "bring-your-own-ui/comments",
+              "bring-your-own-ui/track-changes",
+              "bring-your-own-ui/selection-and-viewport",
+              "bring-your-own-ui/document-control",
+              "bring-your-own-ui/api-reference"
+            ]
+          },
+          {
             "group": "Solutions",
             "pages": [
               "solutions/overview",
