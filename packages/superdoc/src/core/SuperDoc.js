@@ -221,6 +221,10 @@ export class SuperDoc extends EventEmitter {
     this.#init(config, container);
   }
 
+  /**
+   * @param {Config} config
+   * @param {HTMLElement} container
+   */
   async #init(config, container) {
     this.config = {
       ...this.config,
@@ -393,6 +397,7 @@ export class SuperDoc extends EventEmitter {
     const cspNonce = this.config.cspNonce;
 
     const originalCreateElement = document.createElement;
+    /** @param {string} tagName */
     document.createElement = function (tagName) {
       const element = originalCreateElement.call(this, tagName);
       if (tagName.toLowerCase() === 'style') {
@@ -488,7 +493,7 @@ export class SuperDoc extends EventEmitter {
     this.commentsStore = commentsStore;
     this.highContrastModeStore = highContrastModeStore;
     if (typeof this.superdocStore.setExceptionHandler === 'function') {
-      this.superdocStore.setExceptionHandler((payload) => this.emit('exception', payload));
+      this.superdocStore.setExceptionHandler((/** @type {unknown} */ payload) => this.emit('exception', payload));
     }
     this.superdocStore.init(this.config);
     const commentsModuleConfig = this.config.modules.comments;
@@ -1064,6 +1069,7 @@ export class SuperDoc extends EventEmitter {
     this.emit('sidebar-toggle', isOpened);
   }
 
+  /** @param {unknown[]} args */
   #log(...args) {
     (console.debug ? console.debug : console.log)('🦋 🦸‍♀️ [superdoc]', ...args);
   }
