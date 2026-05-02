@@ -1928,4 +1928,173 @@ describe('SuperDoc core', () => {
       expect(outcome.status).toBe('destroyed');
     });
   });
+
+  describe('canPerformPermission', () => {
+    it('returns false when no permission is passed', async () => {
+      createAppHarness();
+
+      const instance = new SuperDoc({
+        selector: '#host',
+        document: 'https://example.com/doc.docx',
+      });
+      await flushMicrotasks();
+
+      expect(instance.canPerformPermission()).toBe(false);
+      expect(instance.canPerformPermission({})).toBe(false);
+      expect(instance.canPerformPermission({ permission: '' })).toBe(false);
+    });
+
+    it('uses config.role and config.isInternal as defaults when caller omits them', async () => {
+      createAppHarness();
+
+      const instance = new SuperDoc({
+        selector: '#host',
+        document: 'https://example.com/doc.docx',
+        role: 'editor',
+        isInternal: true,
+      });
+      await flushMicrotasks();
+
+      // RESOLVE_OWN is granted to editor on internal documents per the matrix.
+      expect(instance.canPerformPermission({ permission: 'RESOLVE_OWN' })).toBe(true);
+    });
+
+    it('returns false when a viewer asks for an editor-only permission', async () => {
+      createAppHarness();
+
+      const instance = new SuperDoc({
+        selector: '#host',
+        document: 'https://example.com/doc.docx',
+        role: 'viewer',
+        isInternal: true,
+      });
+      await flushMicrotasks();
+
+      expect(instance.canPerformPermission({ permission: 'RESOLVE_OWN' })).toBe(false);
+    });
+
+    it('honors a per-call role override regardless of config.role', async () => {
+      createAppHarness();
+
+      const instance = new SuperDoc({
+        selector: '#host',
+        document: 'https://example.com/doc.docx',
+        role: 'viewer',
+        isInternal: true,
+      });
+      await flushMicrotasks();
+
+      expect(instance.canPerformPermission({ permission: 'RESOLVE_OWN', role: 'editor' })).toBe(true);
+    });
+
+    it('lets a config.permissionResolver override the default decision', async () => {
+      createAppHarness();
+
+      const resolver = vi.fn(() => false);
+      const instance = new SuperDoc({
+        selector: '#host',
+        document: 'https://example.com/doc.docx',
+        role: 'editor',
+        isInternal: true,
+        permissionResolver: resolver,
+      });
+      await flushMicrotasks();
+
+      // Editor would normally be granted; the resolver overrides to false.
+      expect(instance.canPerformPermission({ permission: 'RESOLVE_OWN' })).toBe(false);
+      expect(resolver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          permission: 'RESOLVE_OWN',
+          role: 'editor',
+          isInternal: true,
+          defaultDecision: true,
+        }),
+      );
+    });
+
+    it('falls back to the default decision when resolver returns a non-boolean', async () => {
+      createAppHarness();
+
+      const instance = new SuperDoc({
+        selector: '#host',
+        document: 'https://example.com/doc.docx',
+        role: 'viewer',
+        isInternal: true,
+        permissionResolver: () => undefined,
+      });
+      await flushMicrotasks();
+
+      // viewer is denied RESOLVE_OWN by default; resolver returning undefined
+      // must not flip that to true.
+      expect(instance.canPerformPermission({ permission: 'RESOLVE_OWN' })).toBe(false);
+    });
+
+    it('forwards comment and trackedChange payloads to the resolver', async () => {
+      createAppHarness();
+
+      const resolver = vi.fn(() => true);
+      const instance = new SuperDoc({
+        selector: '#host',
+        document: 'https://example.com/doc.docx',
+        role: 'editor',
+        isInternal: true,
+        permissionResolver: resolver,
+      });
+      await flushMicrotasks();
+
+      const comment = { id: 'c-1', body: 'note' };
+      const trackedChange = { id: 'tc-1', type: 'insert', commentId: 'c-1' };
+
+      instance.canPerformPermission({ permission: 'RESOLVE_OWN', comment, trackedChange });
+
+      expect(resolver).toHaveBeenCalledWith(expect.objectContaining({ comment, trackedChange }));
+    });
+
+    it('resolves comment from commentsStore.getComment when trackedChange supplies only an id', async () => {
+      const { commentsStore } = createAppHarness();
+      const stored = { id: 'c-7', body: 'looked up' };
+      commentsStore.getComment = vi.fn(() => stored);
+
+      const resolver = vi.fn(() => true);
+      const instance = new SuperDoc({
+        selector: '#host',
+        document: 'https://example.com/doc.docx',
+        role: 'editor',
+        isInternal: true,
+        permissionResolver: resolver,
+      });
+      await flushMicrotasks();
+
+      // No `comment` passed; trackedChange only carries the id. The method
+      // must fall through to `commentsStore.getComment(commentId)`.
+      const trackedChange = { commentId: 'c-7', type: 'insert' };
+      instance.canPerformPermission({ permission: 'RESOLVE_OWN', trackedChange });
+
+      expect(commentsStore.getComment).toHaveBeenCalledWith('c-7');
+      expect(resolver).toHaveBeenCalledWith(expect.objectContaining({ comment: stored, trackedChange }));
+    });
+
+    it('unwraps a stored comment via getValues() when present', async () => {
+      const { commentsStore } = createAppHarness();
+      const unwrapped = { id: 'c-9', body: 'unwrapped' };
+      commentsStore.getComment = vi.fn(() => ({ getValues: () => unwrapped }));
+
+      const resolver = vi.fn(() => true);
+      const instance = new SuperDoc({
+        selector: '#host',
+        document: 'https://example.com/doc.docx',
+        role: 'editor',
+        isInternal: true,
+        permissionResolver: resolver,
+      });
+      await flushMicrotasks();
+
+      const trackedChange = { id: 'tc-9', type: 'delete' };
+      instance.canPerformPermission({ permission: 'RESOLVE_OWN', trackedChange });
+
+      // The store returned a wrapper with `getValues()`; the method must
+      // unwrap it before forwarding to the resolver.
+      expect(resolver).toHaveBeenCalledWith(expect.objectContaining({ comment: unwrapped }));
+    });
+  });
 });
