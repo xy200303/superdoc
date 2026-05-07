@@ -43,6 +43,13 @@ import { DOM_CLASS_NAMES, buildAnnotationSelector, DRAGGABLE_SELECTOR } from '@s
 import { applyEditableSlotAtInlineBoundary } from '@helpers/ensure-editable-slot-inline-boundary.js';
 import { isSemanticFootnoteBlockId } from '../semantic-flow-constants.js';
 import { CommentsPluginKey } from '@extensions/comment/comments-plugin.js';
+import {
+  findStructuredContentBlockAtPos,
+  findStructuredContentBlockById,
+  findStructuredContentInlineAtPos,
+  findStructuredContentInlineById,
+  type StructuredContentSelection,
+} from '../input/structured-content-resolution.js';
 
 // =============================================================================
 // Constants
@@ -50,6 +57,7 @@ import { CommentsPluginKey } from '@extensions/comment/comments-plugin.js';
 
 const MULTI_CLICK_TIME_THRESHOLD_MS = 400;
 const MULTI_CLICK_DISTANCE_THRESHOLD_PX = 5;
+const DRAG_SELECTION_DISTANCE_THRESHOLD_PX = 5;
 const AUTO_SCROLL_EDGE_PX = 32;
 const AUTO_SCROLL_MAX_SPEED_PX = 24;
 /** Tolerance for detecting scrollability to handle sub-pixel rounding in browsers */
@@ -69,6 +77,7 @@ const COMMENT_THREAD_HIT_SAMPLE_OFFSETS: ReadonlyArray<readonly [number, number]
   [0, COMMENT_THREAD_HIT_TOLERANCE_PX],
 ];
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+const DRAG_SOURCE_SELECTOR = '[data-draggable="true"], [data-drag-source-kind]';
 
 type CommentThreadHit = {
   isAmbiguous: boolean;
@@ -131,7 +140,7 @@ function isOutsidePageBodyContent(layout: Layout, x: number, pageIndex?: number,
     return false;
   }
 
-  const page = layout.pages[pageIndex];
+  const page = layout?.pages?.[pageIndex];
   if (!page) {
     return false;
   }
@@ -419,13 +428,6 @@ export type LayoutState = {
   measures: Measure[];
 };
 
-type StructuredContentSelection = {
-  node: ProseMirrorNode;
-  pos: number;
-  start: number;
-  end: number;
-};
-
 /**
  * Dependencies injected from PresentationEditor.
  */
@@ -570,6 +572,8 @@ export class EditorInputManager {
   #dragLastPointer: SelectionDebugHudState['lastPointer'] = null;
   #dragLastRawHit: PositionHit | null = null;
   #dragUsedPageNotMountedFallback = false;
+  #dragStartClient: { clientX: number; clientY: number } | null = null;
+  #dragThresholdExceeded = false;
   #autoScrollActive = false;
   #autoScrollTimer: { id: number; kind: 'raf' | 'timeout' } | null = null;
   #autoScrollVelocity: { x: number; y: number } = { x: 0, y: 0 };
@@ -846,8 +850,26 @@ export class EditorInputManager {
     this.#dragLastPointer = null;
     this.#dragLastRawHit = null;
     this.#dragUsedPageNotMountedFallback = false;
+    this.#dragStartClient = null;
+    this.#dragThresholdExceeded = false;
     this.#lastPointerClient = null;
     this.#stopAutoScroll();
+  }
+
+  #hasExceededDragSelectionThreshold(clientX: number, clientY: number): boolean {
+    if (this.#dragThresholdExceeded) return true;
+    if (!this.#dragStartClient) return true;
+
+    const deltaX = clientX - this.#dragStartClient.clientX;
+    const deltaY = clientY - this.#dragStartClient.clientY;
+    const thresholdSquared = DRAG_SELECTION_DISTANCE_THRESHOLD_PX * DRAG_SELECTION_DISTANCE_THRESHOLD_PX;
+
+    if (deltaX * deltaX + deltaY * deltaY < thresholdSquared) {
+      return false;
+    }
+
+    this.#dragThresholdExceeded = true;
+    return true;
   }
 
   #clearCellAnchor(): void {
@@ -1342,7 +1364,9 @@ export class EditorInputManager {
     // Handle field annotation clicks
     const annotationEl = target?.closest?.(buildAnnotationSelector()) as HTMLElement | null;
     const isDraggableAnnotation = target?.closest?.(DRAGGABLE_SELECTOR) != null;
-    this.#suppressFocusInFromDraggable = isDraggableAnnotation;
+    const isNativeDragSource = target?.closest?.(DRAG_SOURCE_SELECTOR) != null;
+    const suppressFocusForDrag = isDraggableAnnotation || isNativeDragSource;
+    this.#suppressFocusInFromDraggable = suppressFocusForDrag;
 
     if (annotationEl) {
       this.#handleAnnotationClick(event, annotationEl);
@@ -1360,7 +1384,7 @@ export class EditorInputManager {
 
     if (!layoutState.layout) {
       if (clickedNoteTarget && !isSameRenderedNoteTarget(activeNoteTarget, clickedNoteTarget)) {
-        if (!isDraggableAnnotation) {
+        if (!suppressFocusForDrag) {
           event.preventDefault();
         }
         const activated = this.#callbacks.activateRenderedNoteSession?.(clickedNoteTarget, {
@@ -1392,7 +1416,7 @@ export class EditorInputManager {
         this.#syncNonBodyCommentActivation(event, target, bodyEditor);
       }
 
-      this.#handleClickWithoutLayout(event, isDraggableAnnotation);
+      this.#handleClickWithoutLayout(event, suppressFocusForDrag);
       return;
     }
 
@@ -1405,7 +1429,7 @@ export class EditorInputManager {
     if (clickedNoteTarget) {
       const isSameActiveNote = isSameRenderedNoteTarget(activeNoteTarget, clickedNoteTarget);
       if (!isSameActiveNote) {
-        if (!isDraggableAnnotation) event.preventDefault();
+        if (!suppressFocusForDrag) event.preventDefault();
         const activated = this.#callbacks.activateRenderedNoteSession?.(clickedNoteTarget, {
           clientX: event.clientX,
           clientY: event.clientY,
@@ -1438,11 +1462,24 @@ export class EditorInputManager {
     }
 
     const isNoteEditing = activeNoteSession != null;
-    const useActiveSurfaceHitTest = sessionMode !== 'body' || activeStorySession != null;
-    const editor = sessionMode === 'body' && !isNoteEditing ? bodyEditor : this.#deps.getActiveEditor();
-    if (sessionMode !== 'body') {
+    let currentSessionMode = sessionMode;
+    let useActiveSurfaceHitTest = currentSessionMode !== 'body' || activeStorySession != null;
+    let editor = currentSessionMode === 'body' && !isNoteEditing ? bodyEditor : this.#deps.getActiveEditor();
+    if (currentSessionMode !== 'body') {
       if (this.#handleClickInHeaderFooterMode(event, x, y, normalizedPoint.pageIndex, normalizedPoint.pageLocalY))
         return;
+      // SD-2749: clicking on body content from inside a header/footer session
+      // exits the session synchronously, which also clears the backing story
+      // session. Re-read both so subsequent hit testing and selection dispatch
+      // target the body editor — otherwise ProseMirror's scrollIntoView would
+      // pull the viewport back to the header/footer the user just exited.
+      const refreshedSessionMode = this.#deps.getHeaderFooterSession()?.session?.mode ?? 'body';
+      if (refreshedSessionMode === 'body' && !isNoteEditing) {
+        activeStorySession = this.#deps.getActiveStorySession?.() ?? null;
+        currentSessionMode = 'body';
+        useActiveSurfaceHitTest = activeStorySession != null;
+        editor = bodyEditor;
+      }
     }
 
     // Check for header/footer region hit
@@ -1459,13 +1496,21 @@ export class EditorInputManager {
       }
     }
 
-    if (
-      !useActiveSurfaceHitTest &&
-      isOutsidePageBodyContent(layoutState.layout, x, normalizedPoint.pageIndex, normalizedPoint.pageLocalY)
-    ) {
-      event.preventDefault();
-      this.#focusEditor();
-      return;
+    // Bail when the click did not land on any page body. Two cases:
+    // - SD-2356: click inside a page's bounding box but in the margin/header/footer area.
+    // - SD-2749: click in the gap between pages (no .superdoc-page under the cursor),
+    //   in which case normalizeClientPoint leaves pageIndex undefined.
+    // Both should preserve the current selection and scroll position.
+    if (!useActiveSurfaceHitTest) {
+      const pointerOffAnyPage = !Number.isFinite(normalizedPoint.pageIndex);
+      if (
+        pointerOffAnyPage ||
+        isOutsidePageBodyContent(layoutState.layout, x, normalizedPoint.pageIndex, normalizedPoint.pageLocalY)
+      ) {
+        event.preventDefault();
+        this.#focusEditor();
+        return;
+      }
     }
 
     const { rawHit, hit } = this.#resolveSelectionPointerHit({
@@ -1484,7 +1529,7 @@ export class EditorInputManager {
     this.#callbacks.updateSelectionDebugHud?.();
 
     // Don't preventDefault for draggable annotations
-    if (!isDraggableAnnotation) {
+    if (!suppressFocusForDrag) {
       event.preventDefault();
     }
 
@@ -1620,6 +1665,8 @@ export class EditorInputManager {
     this.#dragLastPointer = { clientX: event.clientX, clientY: event.clientY, x, y };
     this.#dragLastRawHit = hit;
     this.#dragUsedPageNotMountedFallback = false;
+    this.#dragStartClient = { clientX: event.clientX, clientY: event.clientY };
+    this.#dragThresholdExceeded = false;
     this.#lastPointerClient = { clientX: event.clientX, clientY: event.clientY };
 
     this.#isDragging = true;
@@ -1660,7 +1707,7 @@ export class EditorInputManager {
         // SD-1584: clicking inside a block SDT selects the node (NodeSelection).
         // Exception: clicks inside tables nested in this SDT should use text
         // selection so caret placement/editing inside table cells works.
-        const sdtBlock = clickDepth === 1 ? this.#findStructuredContentBlockAtPos(doc, hit.pos) : null;
+        const sdtBlock = clickDepth === 1 ? findStructuredContentBlockAtPos(doc, hit.pos) : null;
         let nextSelection: Selection;
         let inlineSdtBoundaryPos: number | null = null;
         let inlineSdtBoundaryDirection: 'before' | 'after' | null = null;
@@ -1669,7 +1716,7 @@ export class EditorInputManager {
         if (sdtBlock && !insideTableInSdt) {
           nextSelection = NodeSelection.create(doc, sdtBlock.pos);
         } else {
-          const inlineSdt = clickDepth === 1 ? this.#findStructuredContentInlineAtPos(doc, hit.pos) : null;
+          const inlineSdt = clickDepth === 1 ? findStructuredContentInlineAtPos(doc, hit.pos) : null;
           if (inlineSdt && hit.pos >= inlineSdt.end) {
             const afterInlineSdt = inlineSdt.pos + inlineSdt.node.nodeSize;
             inlineSdtBoundaryPos = afterInlineSdt;
@@ -1712,6 +1759,10 @@ export class EditorInputManager {
 
     // Handle drag selection
     if (this.#isDragging && this.#dragAnchor !== null && event.buttons & 1) {
+      if (!this.#hasExceededDragSelectionThreshold(event.clientX, event.clientY)) {
+        return;
+      }
+
       this.#lastPointerClient = { clientX: event.clientX, clientY: event.clientY };
       this.#handleDragSelectionAt(event.clientX, event.clientY);
       this.#updateAutoScrollFromPointer(event.clientX, event.clientY);
@@ -1785,6 +1836,8 @@ export class EditorInputManager {
       this.#dragLastPointer = null;
       this.#dragLastRawHit = null;
       this.#dragUsedPageNotMountedFallback = false;
+      this.#dragStartClient = null;
+      this.#dragThresholdExceeded = false;
       this.#lastPointerClient = null;
       return;
     }
@@ -2006,29 +2059,6 @@ export class EditorInputManager {
     }
   }
 
-  #findStructuredContentBlockAtPos(doc: ProseMirrorNode, pos: number): StructuredContentSelection | null {
-    if (!Number.isFinite(pos)) return null;
-
-    try {
-      const $pos = doc.resolve(pos);
-      for (let depth = $pos.depth; depth > 0; depth--) {
-        const node = $pos.node(depth);
-        if (node.type?.name === 'structuredContentBlock') {
-          return {
-            node,
-            pos: $pos.before(depth),
-            start: $pos.start(depth),
-            end: $pos.end(depth),
-          };
-        }
-      }
-    } catch {
-      return null;
-    }
-
-    return null;
-  }
-
   #isInsideTableWithinStructuredContentBlock(doc: ProseMirrorNode, pos: number, sdtPos: number): boolean {
     if (!Number.isFinite(pos) || !Number.isFinite(sdtPos)) return false;
 
@@ -2057,65 +2087,6 @@ export class EditorInputManager {
     }
   }
 
-  #findStructuredContentBlockById(doc: ProseMirrorNode, id: string): StructuredContentSelection | null {
-    let found: StructuredContentSelection | null = null;
-    doc.descendants((node, pos) => {
-      if (node.type?.name !== 'structuredContentBlock') return true;
-      const nodeId = (node.attrs as { id?: unknown } | null | undefined)?.id;
-      if (String(nodeId ?? '') !== id) return true;
-
-      found = {
-        node,
-        pos,
-        start: pos + 1,
-        end: pos + node.nodeSize - 1,
-      };
-      return false;
-    });
-    return found;
-  }
-
-  #findStructuredContentInlineAtPos(doc: ProseMirrorNode, pos: number): StructuredContentSelection | null {
-    if (!Number.isFinite(pos)) return null;
-
-    try {
-      const $pos = doc.resolve(pos);
-      for (let depth = $pos.depth; depth > 0; depth--) {
-        const node = $pos.node(depth);
-        if (node.type?.name === 'structuredContent') {
-          return {
-            node,
-            pos: $pos.before(depth),
-            start: $pos.start(depth),
-            end: $pos.end(depth),
-          };
-        }
-      }
-    } catch {
-      return null;
-    }
-
-    return null;
-  }
-
-  #findStructuredContentInlineById(doc: ProseMirrorNode, id: string): StructuredContentSelection | null {
-    let found: StructuredContentSelection | null = null;
-    doc.descendants((node, pos) => {
-      if (node.type?.name !== 'structuredContent') return true;
-      const nodeId = (node.attrs as { id?: unknown } | null | undefined)?.id;
-      if (String(nodeId ?? '') !== id) return true;
-
-      found = {
-        node,
-        pos,
-        start: pos + 1,
-        end: pos + node.nodeSize - 1,
-      };
-      return false;
-    });
-    return found;
-  }
-
   #resolveStructuredContentBlockFromElement(
     doc: ProseMirrorNode,
     element: HTMLElement,
@@ -2125,20 +2096,20 @@ export class EditorInputManager {
 
     const sdtId = container.dataset?.sdtId;
     if (sdtId) {
-      const match = this.#findStructuredContentBlockById(doc, sdtId);
+      const match = findStructuredContentBlockById(doc, sdtId);
       if (match) return match;
     }
 
     const containerSdtId = container.dataset?.sdtContainerId;
     if (containerSdtId) {
-      const match = this.#findStructuredContentBlockById(doc, containerSdtId);
+      const match = findStructuredContentBlockById(doc, containerSdtId);
       if (match) return match;
     }
 
     const pmStartRaw = container.dataset?.pmStart;
     const pmStart = pmStartRaw != null ? Number(pmStartRaw) : NaN;
     if (Number.isFinite(pmStart)) {
-      return this.#findStructuredContentBlockAtPos(doc, pmStart);
+      return findStructuredContentBlockAtPos(doc, pmStart);
     }
 
     return null;
@@ -2153,14 +2124,14 @@ export class EditorInputManager {
 
     const sdtId = container.dataset?.sdtId;
     if (sdtId) {
-      const match = this.#findStructuredContentInlineById(doc, sdtId);
+      const match = findStructuredContentInlineById(doc, sdtId);
       if (match) return match;
     }
 
     const pmStartRaw = container.dataset?.pmStart;
     const pmStart = pmStartRaw != null ? Number(pmStartRaw) : NaN;
     if (Number.isFinite(pmStart)) {
-      return this.#findStructuredContentInlineAtPos(doc, pmStart);
+      return findStructuredContentInlineAtPos(doc, pmStart);
     }
 
     return null;
@@ -2684,6 +2655,8 @@ export class EditorInputManager {
     this.#dragLastPointer = null;
     this.#dragLastRawHit = null;
     this.#dragUsedPageNotMountedFallback = false;
+    this.#dragStartClient = null;
+    this.#dragThresholdExceeded = false;
     this.#lastPointerClient = null;
     this.#stopAutoScroll();
   }

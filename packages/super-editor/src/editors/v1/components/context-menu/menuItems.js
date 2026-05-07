@@ -269,7 +269,6 @@ export function getItems(context, customItems = [], includeDefaultItems = true) 
           action: (editor) => {
             editor.commands.createDocumentSection();
           },
-          // TODO: Temporarily disabled - restore original: `return trigger === TRIGGERS.click;`
           showWhen: () => {
             return false;
           },
@@ -286,6 +285,44 @@ export function getItems(context, customItems = [], includeDefaultItems = true) 
             const { trigger, isInSectionNode } = context;
             return trigger === TRIGGERS.click && isInSectionNode;
           },
+        },
+      ],
+    },
+    {
+      id: 'list-marker',
+      isDefault: true,
+      items: [
+        {
+          id: 'list-restart-numbering',
+          label: TEXTS.listRestartNumbering,
+          icon: ICONS.listRestartNumbering,
+          isDefault: true,
+          action: (editor) => editor.commands.restartNumbering(),
+          showWhen: (context) => context.trigger === TRIGGERS.click && context.isOnListMarker,
+        },
+        {
+          id: 'list-continue-numbering',
+          label: TEXTS.listContinueNumbering,
+          icon: ICONS.listContinueNumbering,
+          isDefault: true,
+          action: (editor) => editor.commands.continueNumbering(),
+          showWhen: (context) => context.trigger === TRIGGERS.click && context.isOnListMarker,
+        },
+        {
+          id: 'list-decrease-indent',
+          label: TEXTS.listDecreaseIndent,
+          icon: ICONS.listDecreaseIndent,
+          isDefault: true,
+          action: (editor) => editor.commands.decreaseListIndent(),
+          showWhen: (context) => context.trigger === TRIGGERS.click && context.isOnListMarker,
+        },
+        {
+          id: 'list-increase-indent',
+          label: TEXTS.listIncreaseIndent,
+          icon: ICONS.listIncreaseIndent,
+          isDefault: true,
+          action: (editor) => editor.commands.increaseListIndent(),
+          showWhen: (context) => context.trigger === TRIGGERS.click && context.isOnListMarker,
         },
       ],
     },
