@@ -4,6 +4,7 @@ import { Attribute } from '@core/Attribute.js';
 import { getMarkRange } from '@core/helpers/getMarkRange.js';
 import { findOrCreateRelationship } from '@core/parts/adapters/relationships-mutation.js';
 import { sanitizeHref, encodeTooltip, UrlValidationConstants } from '@superdoc/url-validation';
+import { TRANSIENT_HYPERLINK_STYLE_IDS } from '@extensions/run/calculateInlineRunPropertiesPlugin.js';
 
 /**
  * Target frame options
@@ -36,6 +37,7 @@ import { sanitizeHref, encodeTooltip, UrlValidationConstants } from '@superdoc/u
  * @property {string} [docLocation] - Location in target hyperlink
  * @property {string} [tooltip] - Tooltip for the link
  * @property {string} [rId] @internal Word relationship ID for internal links
+ * @property {boolean} [hadUnderline] @internal Whether selection already had underline before setLink
  */
 
 /**
@@ -119,6 +121,12 @@ export const Link = Mark.create({
        * @param {string} [rId] - Word relationship ID for internal links
        */
       rId: { default: this.options.htmlAttributes.rId || null },
+      /**
+       * @private
+       * @category Attribute
+       * @param {boolean} [hadUnderline] - keep if underline existed before link creation
+       */
+      hadUnderline: { default: false, rendered: false },
       /**
        * @category Attribute
        * @param {string} [text] - Display text for the link
@@ -226,6 +234,16 @@ export const Link = Mark.create({
             to = from + finalText.length;
           }
 
+          let hadUnderline = false;
+          if (underlineMarkType) {
+            state.doc.nodesBetween(from, to, (node) => {
+              if (!node.isText) return;
+              if (node.marks.some((mark) => mark.type === underlineMarkType)) {
+                hadUnderline = true;
+              }
+            });
+          }
+
           if (linkMarkType) tr = tr.removeMark(from, to, linkMarkType);
           if (underlineMarkType) tr = tr.removeMark(from, to, underlineMarkType);
 
@@ -237,7 +255,7 @@ export const Link = Mark.create({
             if (id) rId = id;
           }
 
-          const linkAttrs = { text: finalText, rId };
+          const linkAttrs = { text: finalText, rId, hadUnderline };
           if (sanitizedHref?.href) {
             linkAttrs.href = sanitizedHref.href;
           }
@@ -258,11 +276,80 @@ export const Link = Mark.create({
        */
       unsetLink:
         () =>
-        ({ chain }) => {
-          return chain()
-            .unsetMark('underline', { extendEmptyMarkRange: true })
+        ({ chain, state, editor }) => {
+          const { selection } = state;
+          const linkMarkType = editor.schema.marks.link;
+
+          let { from, to } = selection;
+
+          if (selection.empty && linkMarkType) {
+            const range = getMarkRange(selection.$from, linkMarkType);
+            if (range) {
+              from = range.from;
+              to = range.to;
+            }
+          }
+
+          let hadUnderline = false;
+          if (linkMarkType) {
+            state.doc.nodesBetween(from, to, (node) => {
+              if (!node.isText || hadUnderline) return;
+              const linkMark = node.marks.find((mark) => mark.type === linkMarkType);
+              if (linkMark?.attrs?.hadUnderline) {
+                hadUnderline = true;
+              }
+            });
+          }
+
+          const commandChain = chain();
+          if (!hadUnderline) {
+            commandChain.unsetMark('underline', { extendEmptyMarkRange: true });
+          }
+
+          return commandChain
             .unsetColor()
             .unsetMark('link', { extendEmptyMarkRange: true })
+            .command(({ tr }) => {
+              const textStyleMarkType = tr.doc.type.schema.marks.textStyle;
+              if (textStyleMarkType) {
+                tr.doc.nodesBetween(from, to, (node, pos) => {
+                  if (!node.isText) return;
+
+                  node.marks.forEach((mark) => {
+                    if (mark.type !== textStyleMarkType) return;
+                    if (!TRANSIENT_HYPERLINK_STYLE_IDS.has(mark.attrs?.styleId)) return;
+
+                    const clearedAttrs = { ...mark.attrs, styleId: null };
+                    tr.removeMark(pos, pos + node.nodeSize, mark);
+                    tr.addMark(pos, pos + node.nodeSize, textStyleMarkType.create(clearedAttrs));
+                  });
+                });
+              }
+
+              const runNodesToUpdate = [];
+              tr.doc.nodesBetween(from, to, (node, pos) => {
+                if (node.type.name !== 'run') return;
+                if (!TRANSIENT_HYPERLINK_STYLE_IDS.has(node.attrs?.runProperties?.styleId)) return;
+                runNodesToUpdate.push({ node, pos });
+              });
+
+              runNodesToUpdate
+                .sort((a, b) => b.pos - a.pos)
+                .forEach(({ node, pos }) => {
+                  const mappedPos = tr.mapping.map(pos);
+                  tr.setNodeMarkup(
+                    mappedPos,
+                    node.type,
+                    {
+                      ...node.attrs,
+                      runProperties: { ...node.attrs.runProperties, styleId: null },
+                    },
+                    node.marks,
+                  );
+                });
+
+              return true;
+            })
             .run();
         },
 
