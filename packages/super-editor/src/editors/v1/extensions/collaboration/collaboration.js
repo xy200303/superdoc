@@ -168,6 +168,7 @@ export const Collaboration = Extension.create({
 
     const [syncPlugin, fragment] = createSyncPlugin(this.options.ydoc, this.editor);
     this.options.fragment = fragment;
+    const fragmentNormalizeCleanup = registerYjsFragmentNormalizer(fragment);
 
     const mediaMap = this.options.ydoc.getMap('media');
     const mediaMapObserver = (event) => {
@@ -186,6 +187,7 @@ export const Collaboration = Extension.create({
       syncListenerCleanup,
       mediaMap,
       mediaMapObserver,
+      fragmentNormalizeCleanup,
       metaMap: null,
       metaMapObserver: null,
       partSyncHandle: null,
@@ -269,6 +271,7 @@ export const cleanupCollaborationSideEffects = (editor) => {
   if (!cleanup) return;
 
   cleanup.syncListenerCleanup?.();
+  cleanup.fragmentNormalizeCleanup?.();
   cleanup.mediaMap?.unobserve?.(cleanup.mediaMapObserver);
   cleanup.metaMap?.unobserve?.(cleanup.metaMapObserver);
   cleanup.partSyncHandle?.destroy();
@@ -290,6 +293,21 @@ export const createSyncPlugin = (ydoc, editor) => {
   };
 
   return [ySyncPlugin(fragment, { onFirstRender }), fragment];
+};
+
+const registerYjsFragmentNormalizer = (fragment) => {
+  if (!fragment || typeof fragment.observeDeep !== 'function' || typeof fragment.unobserveDeep !== 'function') {
+    return () => {};
+  }
+
+  const normalize = () => {
+    normalizeYjsFragmentForSchema(fragment);
+  };
+
+  fragment.observeDeep(normalize);
+  return () => {
+    fragment.unobserveDeep(normalize);
+  };
 };
 
 /**

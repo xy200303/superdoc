@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { Doc as YDoc, XmlElement, XmlText } from 'yjs';
+import { applyUpdate, Doc as YDoc, encodeStateAsUpdate, XmlElement, XmlText } from 'yjs';
 import { Editor } from './Editor.js';
 import { getStarterExtensions } from '@extensions/index.js';
 import { seedEditorStateToYDoc } from '@extensions/collaboration/seed-editor-to-ydoc.js';
@@ -215,6 +215,52 @@ describe('Editor collaboration seeding', () => {
       seedEditor.destroy();
       observerEditor.destroy();
       ydoc.destroy();
+    }
+  });
+
+  it('preserves crossReference nodes when room content arrives after collaboration setup', async () => {
+    const observerProvider = createProviderStub();
+    const seedYdoc = new YDoc();
+    const observerYdoc = new YDoc();
+    const seedEditor = createTestEditor();
+    const observerEditor = createTestEditor({
+      ydoc: observerYdoc,
+      collaborationProvider: observerProvider,
+    });
+
+    try {
+      await seedEditor.open(undefined, { mode: 'docx' });
+      const crossReferenceDoc = createCrossReferencePmDoc(seedEditor);
+      seedEditor.dispatch(seedEditor.state.tr.replaceWith(0, seedEditor.state.doc.content.size, crossReferenceDoc));
+
+      seedEditorStateToYDoc(seedEditor, seedYdoc);
+      addCachedResultRunToYjsCrossReference(seedYdoc);
+
+      await observerEditor.open(undefined, {
+        mode: 'docx',
+        isNewFile: false,
+      });
+
+      applyUpdate(observerYdoc, encodeStateAsUpdate(seedYdoc));
+      observerProvider.emit('synced', true);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const observerCrossReferences = collectCrossReferences(observerEditor);
+      expect(observerCrossReferences).toHaveLength(1);
+      expect(observerCrossReferences[0].attrs.instruction).toBe('REF _Ref228977094 \\r \\h');
+      expect(observerCrossReferences[0].attrs.target).toBe('_Ref228977094');
+      expect(observerCrossReferences[0].attrs.resolvedText).toBe('\u200e1');
+    } finally {
+      if (seedEditor.lifecycleState === 'ready') {
+        seedEditor.close();
+      }
+      if (observerEditor.lifecycleState === 'ready') {
+        observerEditor.close();
+      }
+      seedEditor.destroy();
+      observerEditor.destroy();
+      seedYdoc.destroy();
+      observerYdoc.destroy();
     }
   });
 });
