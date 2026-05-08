@@ -138,6 +138,46 @@ describe('Relationships tests', () => {
     expect(hasUnderline).toBe(false);
   });
 
+  it('keeps imported inline underline mark when removing link', async () => {
+    const imported = await loadTestDataForEditorTests('hyperlink_node.docx');
+    const { editor: importedEditor } = initTestEditor({
+      content: imported.docx,
+      media: imported.media,
+      mediaFiles: imported.mediaFiles,
+      fonts: imported.fonts,
+    });
+
+    importedEditor.commands.selectAll();
+
+    let importedUnderlineBefore = 0;
+    let linkCountBefore = 0;
+    importedEditor.state.doc.descendants((node) => {
+      if (!node.isText) return;
+      node.marks.forEach((mark) => {
+        if (mark.type.name === 'underline' && mark.attrs?.autoAdded !== true) importedUnderlineBefore += 1;
+        if (mark.type.name === 'link') linkCountBefore += 1;
+      });
+    });
+
+    expect(linkCountBefore).toBeGreaterThan(0);
+    expect(importedUnderlineBefore).toBeGreaterThan(0);
+
+    importedEditor.commands.unsetLink();
+
+    let importedUnderlineAfter = 0;
+    let linkCountAfter = 0;
+    importedEditor.state.doc.descendants((node) => {
+      if (!node.isText) return;
+      node.marks.forEach((mark) => {
+        if (mark.type.name === 'underline' && mark.attrs?.autoAdded !== true) importedUnderlineAfter += 1;
+        if (mark.type.name === 'link') linkCountAfter += 1;
+      });
+    });
+
+    expect(linkCountAfter).toBe(0);
+    expect(importedUnderlineAfter).toBeGreaterThan(0);
+  });
+
   it('tests that the uploaded image has a rId and a relationship', async () => {
     const blob = await fetch(imageBase64).then((res) => res.blob());
     const file = new File([blob], 'image.png', { type: 'image/png' });

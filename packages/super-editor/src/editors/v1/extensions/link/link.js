@@ -37,7 +37,6 @@ import { TRANSIENT_HYPERLINK_STYLE_IDS } from '@extensions/run/calculateInlineRu
  * @property {string} [docLocation] - Location in target hyperlink
  * @property {string} [tooltip] - Tooltip for the link
  * @property {string} [rId] @internal Word relationship ID for internal links
- * @property {boolean} [hadUnderline] @internal Whether selection already had underline before setLink
  */
 
 /**
@@ -121,12 +120,6 @@ export const Link = Mark.create({
        * @param {string} [rId] - Word relationship ID for internal links
        */
       rId: { default: this.options.htmlAttributes.rId || null },
-      /**
-       * @private
-       * @category Attribute
-       * @param {boolean} [hadUnderline] - keep if underline existed before link creation
-       */
-      hadUnderline: { default: false, rendered: false },
       /**
        * @category Attribute
        * @param {string} [text] - Display text for the link
@@ -234,20 +227,26 @@ export const Link = Mark.create({
             to = from + finalText.length;
           }
 
-          let hadUnderline = false;
+          if (linkMarkType) tr = tr.removeMark(from, to, linkMarkType);
+
           if (underlineMarkType) {
-            state.doc.nodesBetween(from, to, (node) => {
-              if (!node.isText) return;
-              if (node.marks.some((mark) => mark.type === underlineMarkType)) {
-                hadUnderline = true;
-              }
+            const rangesMissingUnderline = [];
+            tr.doc.nodesBetween(from, to, (node, pos) => {
+              if (!node.isText || node.nodeSize <= 0) return;
+              const hasUnderline = node.marks.some((mark) => mark.type === underlineMarkType);
+              if (hasUnderline) return;
+
+              // Only apply while overlapping with current selection/link range
+              const rangeFrom = Math.max(pos, from);
+              const rangeTo = Math.min(pos + node.nodeSize, to);
+              if (rangeFrom >= rangeTo) return;
+              rangesMissingUnderline.push({ from: rangeFrom, to: rangeTo });
+            });
+
+            rangesMissingUnderline.forEach((range) => {
+              tr = tr.addMark(range.from, range.to, underlineMarkType.create({ autoAdded: true }));
             });
           }
-
-          if (linkMarkType) tr = tr.removeMark(from, to, linkMarkType);
-          if (underlineMarkType) tr = tr.removeMark(from, to, underlineMarkType);
-
-          if (underlineMarkType) tr = tr.addMark(from, to, underlineMarkType.create());
 
           let rId = null;
           if (editor.options.mode === 'docx') {
@@ -255,7 +254,7 @@ export const Link = Mark.create({
             if (id) rId = id;
           }
 
-          const linkAttrs = { text: finalText, rId, hadUnderline };
+          const linkAttrs = { text: finalText, rId };
           if (sanitizedHref?.href) {
             linkAttrs.href = sanitizedHref.href;
           }
@@ -279,6 +278,7 @@ export const Link = Mark.create({
         ({ chain, state, editor }) => {
           const { selection } = state;
           const linkMarkType = editor.schema.marks.link;
+          const underlineMarkType = editor.schema.marks.underline;
 
           let { from, to } = selection;
 
@@ -290,26 +290,23 @@ export const Link = Mark.create({
             }
           }
 
-          let hadUnderline = false;
-          if (linkMarkType) {
-            state.doc.nodesBetween(from, to, (node) => {
-              if (!node.isText || hadUnderline) return;
-              const linkMark = node.marks.find((mark) => mark.type === linkMarkType);
-              if (linkMark?.attrs?.hadUnderline) {
-                hadUnderline = true;
-              }
-            });
-          }
-
           const commandChain = chain();
-          if (!hadUnderline) {
-            commandChain.unsetMark('underline', { extendEmptyMarkRange: true });
-          }
 
           return commandChain
             .unsetColor()
             .unsetMark('link', { extendEmptyMarkRange: true })
             .command(({ tr }) => {
+              if (underlineMarkType) {
+                tr.doc.nodesBetween(from, to, (node, pos) => {
+                  if (!node.isText) return;
+                  node.marks.forEach((mark) => {
+                    if (mark.type !== underlineMarkType) return;
+                    if (mark.attrs?.autoAdded !== true) return;
+                    tr.removeMark(pos, pos + node.nodeSize, mark);
+                  });
+                });
+              }
+
               const textStyleMarkType = tr.doc.type.schema.marks.textStyle;
               if (textStyleMarkType) {
                 tr.doc.nodesBetween(from, to, (node, pos) => {
