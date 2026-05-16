@@ -203,11 +203,21 @@ export interface AnchoredMetadataAttachSuccess {
 export type AnchoredMetadataAttachResult = AnchoredMetadataAttachSuccess | AdapterMutationFailure;
 
 /**
- * Successful mutation outcome for update / remove. `remove` is atomic:
- * both the anchor SDT (wrapper only — content stays in the document) and
- * the payload entry are removed in a single mutation; no dangling state.
- * When the backing Storage Part has no remaining entries, the part itself
- * is removed.
+ * Successful mutation outcome for update / remove.
+ *
+ * `remove` strips both the anchor content control (wrapper only, content
+ * stays in the document) and the payload entry, in that order. When the
+ * backing Storage Part has no remaining entries, the part itself is
+ * removed.
+ *
+ * In v1 these writes are sequenced, not transactional. The anchor lives
+ * in ProseMirror doc state and the payload lives in the OOXML package:
+ * two different state systems with no shared commit primitive. The
+ * adapter resolves the target up-front so the common failure mode
+ * (`TARGET_NOT_FOUND`) fails before any state change, but a crash
+ * strictly between the PM dispatch and the customXml write can leave a
+ * dangling payload entry. A future revision may add cross-state
+ * compensation.
  */
 export interface AnchoredMetadataMutationSuccess {
   success: true;

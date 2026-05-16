@@ -6411,7 +6411,7 @@ export const OPERATION_DEFINITIONS = {
   'metadata.remove': {
     memberPath: 'metadata.remove',
     description:
-      'Atomically remove an anchored-metadata entry. Strips the anchor SDT wrapper (its content stays in the document) and deletes the payload entry from the Storage Part; both succeed or neither does. When the backing part has no remaining entries, the part itself is removed.',
+      'Remove an anchored-metadata entry. Strips the anchor content-control wrapper (its content stays in the document) and deletes the payload entry from the Storage Part. In v1 these writes are sequenced, not transactional: the adapter resolves the target up-front so missing-target failures land before any state change, but a crash strictly between the two writes can leave a dangling payload. When the backing part has no remaining entries, the part itself is removed.',
     expectedResult: 'Returns an AnchoredMetadataMutationResult with the removed entry id on success or a failure.',
     requiresDocumentContext: true,
     metadata: mutationOperation({
