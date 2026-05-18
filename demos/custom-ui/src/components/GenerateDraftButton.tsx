@@ -97,11 +97,11 @@ export function GenerateDraftButton() {
   return (
     <div className="generate-draft">
       <button className="primary generate-draft-btn" onClick={generate} disabled={busy || !host}>
-        {busy ? 'Generating\u2026' : 'Generate draft with sources'}
+        {busy ? 'Inserting\u2026' : 'Insert sample cited draft'}
       </button>
       <p className="generate-draft-help">
-        Mocked stand-in for an AI/RAG pipeline. Inserts a pre-canned paragraph with citations
-        pre-attached, the way a real legal-AI product would emit source-grounded output.
+        Mocked stand-in for a chat/prompt workflow. Inserts sample text with citations already
+        attached, the way a real legal-AI product would emit source-grounded output.
       </p>
       {error && <div className="composer-error">{error}</div>}
     </div>

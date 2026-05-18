@@ -33,8 +33,8 @@ export function CitationsPanel() {
       {loading && <div className="citations-empty">Loading\u2026</div>}
       {!loading && citations.length === 0 && (
         <div className="citations-empty">
-          No sources cited yet. Click <em>Generate draft with sources</em> to insert AI-generated
-          text with citations pre-attached.
+          No sources cited yet. Click <em>Insert sample cited draft</em> to insert sample text
+          with citations already attached.
         </div>
       )}
 

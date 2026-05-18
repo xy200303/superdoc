@@ -795,7 +795,7 @@ button {
   z-index: 5;
 }
 .citation-highlight {
-  background: rgba(37, 99, 235, 0.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   border-bottom: 2px solid var(--accent);
   pointer-events: none;
   border-radius: 2px;
