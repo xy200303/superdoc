@@ -149,6 +149,25 @@ const FACADE_ENTRIES = [
     runsCommandSignatureProbe: false,
     ticket: 'SD-3179',
   },
+  // SD-3207: legacy headless-toolbar framework helpers. Each entry
+  // re-exports `useHeadlessToolbar` only. Same classification as the
+  // root `legacy/headless-toolbar` entry above.
+  {
+    name: 'legacy/headless-toolbar-react',
+    esm: path.join(PUBLIC_DIST, 'legacy', 'headless-toolbar-react.d.ts'),
+    cjs: path.join(PUBLIC_DIST, 'legacy', 'headless-toolbar-react.d.cts'),
+    expectedNames: ['useHeadlessToolbar'],
+    runsCommandSignatureProbe: false,
+    ticket: 'SD-3207',
+  },
+  {
+    name: 'legacy/headless-toolbar-vue',
+    esm: path.join(PUBLIC_DIST, 'legacy', 'headless-toolbar-vue.d.ts'),
+    cjs: path.join(PUBLIC_DIST, 'legacy', 'headless-toolbar-vue.d.cts'),
+    expectedNames: ['useHeadlessToolbar'],
+    runsCommandSignatureProbe: false,
+    ticket: 'SD-3207',
+  },
   // SD-3180: legacy leaf entries. These match the existing single-types
   // pattern of the live `superdoc/converter` / `superdoc/docx-zipper` /
   // `superdoc/file-zipper` subpaths, which do not have `.d.cts` shims

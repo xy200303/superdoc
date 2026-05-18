@@ -146,6 +146,17 @@ const cjsDeclarationShims = [
     source: path.join(distRoot, 'superdoc/src/public/legacy/headless-toolbar.d.ts'),
     target: './headless-toolbar.js',
   },
+  // SD-3207: legacy headless-toolbar framework helpers.
+  {
+    file: path.join(distRoot, 'superdoc/src/public/legacy/headless-toolbar-react.d.cts'),
+    source: path.join(distRoot, 'superdoc/src/public/legacy/headless-toolbar-react.d.ts'),
+    target: './headless-toolbar-react.js',
+  },
+  {
+    file: path.join(distRoot, 'superdoc/src/public/legacy/headless-toolbar-vue.d.cts'),
+    source: path.join(distRoot, 'superdoc/src/public/legacy/headless-toolbar-vue.d.ts'),
+    target: './headless-toolbar-vue.js',
+  },
   // SD-3184: types facade — type-only entry. The existing `./types`
   // subpath has split types.import/types.require declarations, so the
   // facade needs a real .d.cts shim. `typeOnly: true` forces the shim
