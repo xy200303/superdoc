@@ -35,16 +35,20 @@ const repoRoot = join(__dirname, '..', '..');
 
 const skipPack = process.argv.includes('--skip-pack');
 
-// SD-3213a (retire SD-2860 source-sync gate): the public-type surface is now
-// canonically defined in `packages/superdoc/src/public/index.ts` and is
-// snapshot-locked by `snapshot-superdoc-root-exports.mjs` + classified by
-// `superdoc-root-classification.json` + closure-gated by
-// `check-root-classification-closure.mjs` and verified by
-// `verify-public-facade-emit.cjs`. The pre-flip source-sync check that
-// pointed at `packages/superdoc/src/index.js`'s JSDoc typedef block was
-// removed because that file is no longer the source of truth.
-// `src/all-public-types.ts` remains as a static fixture for the SD-2842
-// "all public types are real" scenarios below.
+// SD-3213a: fail fast if `src/all-public-types.ts` has drifted from the
+// canonical type-only root contract in `superdoc-root-classification.json`.
+// Replaces the retired pre-flip source-sync gate (SD-2860) that pointed at
+// the legacy `packages/superdoc/src/index.js` typedef block. The fixture
+// is the input to the SD-2842 any-collapse scenarios below; without this
+// gate, a new type-only root export would land uncovered.
+console.log('Checking all-public-types.ts fixture against the classification...');
+try {
+  execSync('node check-all-public-types-fixture.mjs', { cwd: __dirname, stdio: 'inherit' });
+} catch (e) {
+  console.error('\nPublic-types fixture check failed (see message above).');
+  process.exit(1);
+}
+console.log();
 
 if (!skipPack) {
   console.log('Packing superdoc and reinstalling fixture...');

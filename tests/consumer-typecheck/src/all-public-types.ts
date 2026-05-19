@@ -6,19 +6,22 @@
  * `const _real_X: AssertNotAny<X> = true` lines fail to compile if X
  * has collapsed. A missing export shows up as TS2305 on the import.
  *
- * SD-3213a (post root facade flip): this file is now a STATIC FIXTURE,
- * not a generated artifact. The pre-flip source-sync gate (SD-2860,
- * `check-public-types.mjs`) pointed at the legacy
- * `packages/superdoc/src/index.js` typedef block, which is no longer
- * the source of truth for the root contract. The canonical root
- * surface is now `packages/superdoc/src/public/index.ts`, locked by
+ * SD-3213a (post root facade flip): this file is no longer auto-generated
+ * from `packages/superdoc/src/index.js`'s typedef block — that file is no
+ * longer the canonical source of truth for the root contract after the
+ * SD-3212 PR C root types flip. The canonical root surface is now
+ * `packages/superdoc/src/public/index.ts`, locked by
  * `tests/consumer-typecheck/snapshots/superdoc-root-exports.json` and
  * classified at `tests/consumer-typecheck/snapshots/superdoc-root-classification.json`.
  *
- * When a new root export lands, manually add a corresponding
- * `import { X } from 'superdoc';` + `const _real_X: AssertNotAny<X> = ...;`
- * line below. The SD-2842 scenarios in `typecheck-matrix.mjs` exercise
- * this file to catch any new types collapsing to `any`.
+ * When a new TYPE-ONLY root export lands (inDts true, inEsm/inCjs false
+ * in the classification), add a corresponding
+ * `import { X } from 'superdoc';` + `const _real_X: AssertNotAny<X> = true;`
+ * line below. The `check-all-public-types-fixture.mjs` gate derives the
+ * expected assertion set from the classification artifact and fails CI
+ * if any type-only export is missing here, so you cannot silently land a
+ * new root type without any-collapse coverage. The SD-2842 matrix
+ * scenarios then exercise this file to catch the actual any-collapses.
  */
 import type {
   BinaryData,
