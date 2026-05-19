@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-05-19T10:47:17.242Z",
+  "generatedAt": "2026-05-19T11:33:50.546Z",
   "summary": {
     "total": 200,
     "byBucket": {
-      "legacy-root": 59,
-      "internal-candidate": 9,
+      "legacy-root": 60,
+      "internal-candidate": 8,
       "supported-root": 132
     },
     "byConfidence": {
@@ -1534,10 +1534,10 @@
     },
     {
       "name": "SectionMetadata",
-      "bucket": "internal-candidate",
-      "rationale": "Layout/section engine metadata; not surfaced through public callbacks today.",
+      "bucket": "legacy-root",
+      "rationale": "Return-type member of PresentationEditor.getLayoutSnapshot() (line 2744): { layout, blocks, measures, sectionMetadata: SectionMetadata[] }. Legacy via PE closure; caught by the SD-3212 a1b closure gate after manual analysis missed it.",
       "confidence": "high",
-      "source": "locked",
+      "source": "closure-gate-promoted",
       "inDts": true,
       "inDcts": true,
       "inEsm": false,

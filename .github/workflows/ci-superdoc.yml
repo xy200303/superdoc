@@ -171,6 +171,13 @@ jobs:
         # companion .md but are not blockers on their own.
         run: node tests/consumer-typecheck/snapshot-superdoc-root-exports.mjs --check
 
+      - name: Root classification closure gate (SD-3212 PR A1b)
+        # Asserts the dependency-closure rule from the A1 classification:
+        # no supported-root or legacy-root exported root symbol may reference
+        # an internal-candidate root symbol in its public declared type.
+        # Catches the failure class behind Phase 4a's 31-failure dry-run.
+        run: node tests/consumer-typecheck/check-root-classification-closure.mjs
+
   unit-tests:
     needs: build
     runs-on: ubuntu-latest

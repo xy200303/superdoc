@@ -135,6 +135,9 @@ jobs:
       - name: Root no-growth + 4-source inventory (SD-3212 PR A0)
         run: node tests/consumer-typecheck/snapshot-superdoc-root-exports.mjs --check
 
+      - name: Root classification closure gate (SD-3212 PR A1b)
+        run: node tests/consumer-typecheck/check-root-classification-closure.mjs
+
       - name: Release stable packages (orchestrator)
         id: stable_release
         env:

@@ -1,6 +1,6 @@
 # SD-3212 A1 — root classification
 
-Generated: 2026-05-19T10:47:17.245Z
+Generated: 2026-05-19T11:33:50.546Z
 Input: tests/consumer-typecheck/snapshots/superdoc-root-exports.json (200 names, locked baseline)
 
 ## Summary
@@ -8,9 +8,9 @@ Input: tests/consumer-typecheck/snapshots/superdoc-root-exports.json (200 names,
 | Bucket | Count |
 |---|---|
 | supported-root | 132 |
-| legacy-root | 59 |
+| legacy-root | 60 |
 | move-to-subpath | 0 |
-| internal-candidate | 9 |
+| internal-candidate | 8 |
 | NEEDS-REVIEW | 0 |
 | **total** | **200** |
 
@@ -153,7 +153,7 @@ Confidence: high=98, medium=100, needs-review=0.
 | `isMarkType` | high | locked | Runtime type guard for mark-type predicates. Customer-facing schema introspection helper. |
 | `isNodeType` | high | locked | Runtime type guard for node-type predicates. Customer-facing schema introspection helper. |
 
-## legacy-root (59)
+## legacy-root (60)
 
 | Name | Confidence | Source | Rationale |
 |---|---|---|---|
@@ -205,6 +205,7 @@ Confidence: high=98, medium=100, needs-review=0.
 | `RemoteCursorState` | high | locked | PE awareness/remote-cursor API surface type. Legacy via PE closure. |
 | `RemoteUserInfo` | high | locked | PE awareness/remote-cursor API surface type. Legacy via PE closure. |
 | `Schema` | high | pm-internal | ProseMirror primitive type. Editor state/view/schema/transaction are deprecated direct-access surfaces (CLAUDE.md). Customers should use Document API. |
+| `SectionMetadata` | high | closure-gate-promoted | Return-type member of PresentationEditor.getLayoutSnapshot() (line 2744): { layout, blocks, measures, sectionMetadata: SectionMetadata[] }. Legacy via PE closure; caught by the SD-3212 a1b closure gate after manual analysis missed it. |
 | `SlashMenu` | high | locked | Legacy component. Sparse public evidence (0 docs, 0 examples, 1 demo, 1 fixture) but currently typed. |
 | `SuperConverter` | high | locked | Legacy converter family entry. Same posture as ./converter subpath. |
 | `SuperEditor` | high | locked | Older naming, predates SuperDoc as the canonical entry. Keep compiling; new code should use SuperDoc. |
@@ -217,7 +218,7 @@ Confidence: high=98, medium=100, needs-review=0.
 | `VirtualizationOptions` | high | locked | Types fields in PresentationEditorOptions. Legacy via PE closure. |
 | `fieldAnnotationHelpers` | high | locked | Documented at apps/docs/extensions/field-annotation.mdx and demos/fields/src/App.vue. Real public surface today; should migrate after SD-3192 decides fieldAnnotations.* Document API. |
 
-## internal-candidate (9)
+## internal-candidate (8)
 
 | Name | Confidence | Source | Rationale |
 |---|---|---|---|
@@ -225,7 +226,6 @@ Confidence: high=98, medium=100, needs-review=0.
 | `LayoutUpdatePayload` | high | locked | Layout engine update payload. PE-internal; NOT used in any public Editor/PE method signature (the closure goes through `LayoutState & { layout; metrics? }`, not this named alias). |
 | `RemoteCursorsRenderPayload` | high | locked | PresentationEditor render-payload event. PE-internal; not in any public PE method signature. |
 | `SectionHelpers` | high | locked | Implementation helper in packages/super-editor/.../document-section/helpers.js, used by structured-content internals. |
-| `SectionMetadata` | high | locked | Layout/section engine metadata; not surfaced through public callbacks today. |
 | `TelemetryEvent` | high | locked | PresentationEditor layout/error/remoteCursorsRender event union. Source file marks adjacent types as "Internal Types". No public docs. |
 | `registeredHandlers` | high | locked | Registry side-effect; 0 docs, 0 examples. Not customer-facing API. |
 | `superEditorHelpers` | high | locked | Helper namespace bag. 0 docs, 0 examples. Likely accidental export. |
