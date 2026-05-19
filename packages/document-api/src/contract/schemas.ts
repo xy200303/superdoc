@@ -2613,6 +2613,18 @@ const customXmlPartCreateMutation = refMutationSchemas(
   ['id', 'partName', 'propsPartName'],
 );
 
+// --- Anchored-metadata schemas (metadata.*) ---
+const anchoredMetadataAttachMutation = refMutationSchemas(
+  {
+    id: { type: 'string', minLength: 1 },
+    namespace: { type: 'string', minLength: 1 },
+    partName: { type: 'string', minLength: 1 },
+  },
+  ['id', 'namespace', 'partName'],
+);
+
+const anchoredMetadataMutation = refMutationSchemas({ id: { type: 'string', minLength: 1 } }, ['id']);
+
 // --- Footnote schemas ---
 const footnoteAddressSchema: JsonSchema = objectSchema(
   { kind: { const: 'entity' }, entityType: { const: 'footnote' }, noteId: { type: 'string' } },
@@ -7701,6 +7713,44 @@ const operationSchemas: Record<OperationId, OperationSchemaSet> = {
   'customXml.parts.remove': {
     input: objectSchema({ target: customXmlPartTargetSchema }, ['target']),
     ...customXmlPartMutation,
+  },
+
+  // --- metadata.* (anchored metadata) ---
+  'metadata.attach': {
+    input: objectSchema(
+      {
+        target: selectionTargetSchema,
+        namespace: { type: 'string', minLength: 1 },
+        payload: {},
+        id: { type: 'string', minLength: 1 },
+      },
+      ['target', 'namespace', 'payload'],
+    ),
+    ...anchoredMetadataAttachMutation,
+  },
+  'metadata.list': {
+    input: objectSchema({
+      ...refListQueryProperties,
+      namespace: { type: 'string' },
+      within: selectionTargetSchema,
+    }),
+    output: discoveryOutputSchema,
+  },
+  'metadata.get': {
+    input: objectSchema({ id: { type: 'string', minLength: 1 } }, ['id']),
+    output: { oneOf: [{ type: 'object' }, { type: 'null' }] },
+  },
+  'metadata.update': {
+    input: objectSchema({ id: { type: 'string', minLength: 1 }, payload: {} }, ['id', 'payload']),
+    ...anchoredMetadataMutation,
+  },
+  'metadata.remove': {
+    input: objectSchema({ id: { type: 'string', minLength: 1 } }, ['id']),
+    ...anchoredMetadataMutation,
+  },
+  'metadata.resolve': {
+    input: objectSchema({ id: { type: 'string', minLength: 1 } }, ['id']),
+    output: { oneOf: [{ type: 'object' }, { type: 'null' }] },
   },
 };
 
