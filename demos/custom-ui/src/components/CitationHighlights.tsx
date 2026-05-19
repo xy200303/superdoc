@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ViewportRect } from 'superdoc/ui';
-import { useSuperDocContentControls, useSuperDocUI } from 'superdoc/ui/react';
+import { useSuperDocUI } from 'superdoc/ui/react';
 import { useCitations } from './useCitations';
 
 /**
  * Renders absolute-positioned overlay rectangles on every cited span.
  *
- * Two-step lookup. `editor.doc.metadata.*` keys by the metadata id
- * (which is the SDT's `w:tag`); `ui.contentControls.getRect({ id })`
- * keys by the SDT's PM node id (which the painter stamps as
- * `data-sdt-id`). These are different identifiers. The contentControls
- * slice surfaces both per item (`target.nodeId` + `properties.tag`),
- * so we build a tag → nodeId map and translate at measure time.
+ * Geometry comes from `ui.metadata.getRect({ id })`. The handle hides
+ * the underlying lookup (metadata id = SDT `w:tag` → SDT node id →
+ * painter rect) so consumers only carry the metadata id they originally
+ * passed to `editor.doc.metadata.attach`. Before SD-3204 this demo had
+ * to compose `useSuperDocContentControls` + a tag → nodeId map +
+ * `ui.contentControls.getRect`; that bridge is now obviated.
  *
- * `getRect` returns `rects[]` — one ViewportRect per painted line of a
- * wrapped span — so line-wrapped citations get clean per-line
+ * `getRect` returns `rects[]` on success (one ViewportRect per painted
+ * line of a wrapped span), so line-wrapped citations get clean per-line
  * underlines without spilling across the page margin.
  *
  * Remeasure triggers: window scroll/resize, ResizeObserver on the
@@ -28,27 +28,10 @@ import { useCitations } from './useCitations';
  */
 type HighlightEntry = { metadataId: string; tooltip: string; rects: ViewportRect[] };
 
-type CCItem = { target?: { nodeId?: string }; properties?: { tag?: string } };
-
 export function CitationHighlights() {
   const ui = useSuperDocUI();
   const { citations } = useCitations();
-  const cc = useSuperDocContentControls();
   const [entries, setEntries] = useState<HighlightEntry[]>([]);
-
-  // tag (= metadata id) → PM node id. Refreshes whenever the slice
-  // items array reference changes.
-  const tagToNodeId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const item of (cc.items ?? []) as unknown as CCItem[]) {
-      const tag = item.properties?.tag;
-      const nodeId = item.target?.nodeId;
-      if (typeof tag === 'string' && typeof nodeId === 'string') {
-        map.set(tag, nodeId);
-      }
-    }
-    return map;
-  }, [cc.items]);
 
   useEffect(() => {
     if (!ui) {
@@ -59,9 +42,7 @@ export function CitationHighlights() {
     const remeasure = () => {
       const next: HighlightEntry[] = [];
       for (const c of citations) {
-        const nodeId = tagToNodeId.get(c.id);
-        if (!nodeId) continue;
-        const result = ui.contentControls.getRect({ id: nodeId });
+        const result = ui.metadata.getRect({ id: c.id });
         if (!result.success) continue;
         next.push({
           metadataId: c.id,
@@ -91,8 +72,8 @@ export function CitationHighlights() {
     const resizeObserver = canvas ? new ResizeObserver(scheduleRemeasure) : null;
     if (canvas && resizeObserver) resizeObserver.observe(canvas);
 
-    // Skip the DOM-mutation observer when there are no citations to track —
-    // keeps the demo from observing the editor body when there's nothing to update.
+    // Skip the DOM-mutation observer when there are no citations to track,
+    // so the demo doesn't observe the editor body when there's nothing to update.
     const mutationObserver =
       canvas && citations.length > 0
         ? new MutationObserver(scheduleRemeasure)
@@ -108,7 +89,7 @@ export function CitationHighlights() {
       mutationObserver?.disconnect();
       if (rafHandle !== null) cancelAnimationFrame(rafHandle);
     };
-  }, [ui, citations, tagToNodeId]);
+  }, [ui, citations]);
 
   return (
     <div className="citation-highlights" aria-hidden>

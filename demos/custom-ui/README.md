@@ -1,10 +1,10 @@
 # SuperDoc Custom UI demo
 
-A reference workspace built on the `superdoc/ui/react` surface. Toolbar, comment threads, tracked-change review, custom commands, DOCX round-trip, in one app.
+A reference workspace built on the `superdoc/ui/react` surface. The headline use case is **source-grounded citations**: insert a mock RAG-generated draft, see anchored citation highlights with hover previews, navigate from a sources panel, edit or remove citations. Wrapped in a full editor workspace: custom toolbar, comment threads, tracked-change review, custom commands, and DOCX round-trip.
 
-See the [Custom UI docs](https://docs.superdoc.dev/editor/custom-ui/overview) for the conceptual guide.
+See the [Custom UI docs](https://docs.superdoc.dev/editor/custom-ui/overview) for the conceptual guide, and the upcoming [source-grounded citations feature page](https://docs.superdoc.dev/document-api/features/anchored-metadata) for the citation story.
 
-This demo shows how the pieces compose in a real product, not a single-concept recipe. Read it alongside the docs above when you're wiring your own toolbar or panel.
+This demo shows how the pieces compose in a real product, not a single-concept recipe. Read it alongside the docs above when you're wiring your own toolbar, sources panel, or citation overlay.
 
 ## Run
 
@@ -21,6 +21,11 @@ Open http://localhost:5189.
 
 ## What you can do here
 
+- Open the **Sources** tab and click **Insert sample cited draft**. A mocked RAG-generated paragraph is inserted at the end of the document; each cited span is anchored with `editor.doc.metadata.attach` and rendered with a highlight overlay.
+- Hover a citation highlight to see the source's display text, locator, provider, and confidence. The popover reads the payload via `ui.viewport.entityAt` + `metadata.get`.
+- Click **Scroll to** in the sources panel to navigate to a cited span. Uses `ui.metadata.scrollIntoView({ id })`.
+- Click **Edit** on a citation to change `displayText`, `locator`, or `excerpt`. Calls `editor.doc.metadata.update`.
+- Click **Remove** to strip the anchor and payload. Calls `editor.doc.metadata.remove`.
 - Click toolbar buttons (bold, italic, lists, undo, redo) wired through `useSuperDocCommand`.
 - Insert a custom clause registered with `ui.commands.register`. The button works, and so does its keyboard shortcut `Mod-Shift-C`, declared on the registration rather than wired in a separate keydown listener.
 - Switch between Edit and Suggest. In Suggest, every edit lands as a tracked change.
@@ -29,6 +34,21 @@ Open http://localhost:5189.
 - Add a comment. The composer captures the selection on open, posts on submit, and restores the visible range on close so the user keeps their place.
 - Accept or reject tracked changes. Decided ones move to a Resolved section.
 - Export the doc, edit it in Word, click Import, watch the activity feed update.
+
+## Source-grounded citations
+
+The demo composes anchored citation pointers on top of `editor.doc.metadata.*` and `ui.metadata.*`:
+
+| Layer | What it does | Code |
+| --- | --- | --- |
+| **Mock RAG output** | Pre-canned text + per-citation payloads (sourceId, displayText, locator, excerpt, confidence). Stand-in for a real generation pipeline. | `mockDraft.ts` |
+| **Insert + attach** | Inserts the text via `editor.doc.insert`, then computes a `SelectionTarget` for each cited span and calls `editor.doc.metadata.attach` per citation. | `GenerateDraftButton.tsx`, `useCitations.ts` |
+| **Sources panel** | Lists citations grouped by `sourceId`. Scroll-to navigation uses `ui.metadata.scrollIntoView({ id })`. Edit form calls `editor.doc.metadata.update`. | `CitationsPanel.tsx` |
+| **Highlight overlay** | Renders one absolute-positioned rectangle per painted line of each cited span. Rects come from `ui.metadata.getRect({ id })`. Remeasures on scroll, resize, ResizeObserver, and MutationObserver. | `CitationHighlights.tsx` |
+| **Hover popover** | `ui.viewport.entityAt({ x, y })` returns the content control under the cursor; `metadata.get({ id })` fetches the payload to render. | `CitationPopover.tsx` |
+| **Persistence** | Hidden inline content controls in the body carry the stable id in `w:tag`; payloads live in a namespaced custom XML data part. Survives DOCX export, reopen, and Word save (validated by the `word-roundtrip` fixtures in the monorepo). | `editor.doc.metadata.*` |
+
+`ui.metadata.*` is the supported public surface for consumer-side geometry and navigation; consumers carry the metadata id and never see the SDT node id underneath.
 
 ## Architecture
 
@@ -39,7 +59,10 @@ SuperDocUIProvider                one controller per app
     ├── SelectionPopover          ui.selection.getAnchorRect, bubble menu over the selection
     ├── ContextMenu               ui.viewport.contextAt + ui.commands.getContextMenuItems(context) + item.invoke()
     ├── ContextMenuRegistrations  ui.commands.register({ contextMenu: { when } })
-    └── ActivitySidebar           ui.comments + ui.trackChanges + ui.selection
+    ├── CitationHighlights        ui.metadata.getRect, painted overlay across cited spans
+    ├── CitationPopover           ui.viewport.entityAt + metadata.get, hover preview
+    └── ActivitySidebar           ui.comments + ui.trackChanges + ui.selection (Activity tab)
+        ├── CitationsPanel        editor.doc.metadata.list/get/update/remove + ui.metadata.scrollIntoView (Sources tab)
         └── CommentComposer       ui.selection.capture / restore + ui.comments.createFromCapture
 ```
 
@@ -83,5 +106,5 @@ Right-click on plain text where no item matches falls through to the browser's n
 
 - No design system. Patterns over CSS, copy them into yours.
 - No backend. The clause library in `<InsertClauseButton>` is hardcoded. Real consumers fetch from their own API and call `reg.invalidate()` when permissions or availability change.
-- No AI provider. Custom commands can call any LLM from `execute`. The demo picked "Insert clause" because it's concrete and self-contained.
+- No live AI provider. The citation flow uses pre-canned draft text + payloads in `mockDraft.ts` instead of calling an LLM. Real consumers replace this with their RAG output, but the shape that flows into `editor.doc.metadata.attach` (text + cited ranges + payloads) stays the same.
 - Telemetry is off (`telemetry: { enabled: false }` in `EditorMount.tsx`) because there's no analytics endpoint to receive events. SuperDoc defaults to enabled.

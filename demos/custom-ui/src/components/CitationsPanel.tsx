@@ -1,31 +1,32 @@
 import { useMemo, useState } from 'react';
 import { useSuperDocUI } from 'superdoc/ui/react';
-import { selectionTargetToTextTarget, type CitationInfo, type CitationPayload } from './citations-types';
+import type { CitationInfo, CitationPayload } from './citations-types';
 import { useCitations } from './useCitations';
 import { GenerateDraftButton } from './GenerateDraftButton';
 
 type UpdateCitation = (id: string, payload: CitationPayload) => { error?: string };
 
 /**
- * References panel. Renders citations grouped by `sourceId` — the
- * pattern Harvey / CoCounsel / Lexis+ use for the side panel beside
- * AI-generated output. Each source group shows the metadata and links
- * back to every cited span in the body. No manual composer; citations
- * arrive via `metadata.attach` from the mocked generation pipeline.
+ * References panel. Renders citations grouped by `sourceId`, the
+ * pattern legal-AI products use for the side panel beside generated
+ * output. Each source group shows the metadata and links back to
+ * every cited span in the body. No manual composer; citations arrive
+ * via `metadata.attach` from the mocked generation pipeline.
  */
 export function CitationsPanel() {
   const ui = useSuperDocUI();
-  const { citations, resolve, remove, update, loading } = useCitations();
+  const { citations, remove, update, loading } = useCitations();
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const groups = useMemo(() => groupBySource(citations), [citations]);
 
+  // Single-call navigation: `ui.metadata.scrollIntoView` resolves the
+  // metadata id to its anchor range internally. Before SD-3204 the demo
+  // had to call `metadata.resolve` and convert SelectionTarget to
+  // TextTarget by hand before calling `ui.viewport.scrollIntoView`.
   const scrollTo = async (id: string) => {
     if (!ui) return;
-    const selectionTarget = resolve(id);
-    const textTarget = selectionTargetToTextTarget(selectionTarget);
-    if (!textTarget) return;
-    await ui.viewport.scrollIntoView({ target: textTarget });
+    await ui.metadata.scrollIntoView({ id, block: 'center' });
   };
 
   return (
@@ -120,7 +121,7 @@ function groupBySource(citations: CitationInfo[]): ReferenceGroup[] {
 }
 
 /**
- * Inline edit form. Exercises `metadata.update` — the lawyer can fix
+ * Inline edit form. Exercises `metadata.update` so the lawyer can fix
  * displayText, locator, or excerpt without re-running the generation
  * pipeline. `citationId`, `sourceId`, `sourceType`, and `provider` are
  * locked here because changing those would mean a different citation,
@@ -130,7 +131,7 @@ function groupBySource(citations: CitationInfo[]): ReferenceGroup[] {
  * `update` is passed from the parent `CitationsPanel` rather than read
  * via a child-local `useCitations()`. A payload-only `metadata.update`
  * does not change the SDT structure, so the parent's content-controls
- * slice does not tick — a child-local hook would only refresh the
+ * slice does not tick; a child-local hook would only refresh the
  * child's own copy of `citations`, leaving the parent panel stale on
  * Save.
  */

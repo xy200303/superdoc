@@ -14,8 +14,8 @@
   },
   {
     "id": "custom-ui",
-    "title": "Custom UI",
-    "description": "A full editor workspace with a custom toolbar, activity panel, comments, tracked changes, custom commands, import, and export.",
+    "title": "Custom UI with source-grounded citations",
+    "description": "Source-grounded citations grounded in the document: insert a mock RAG-generated draft, see anchored citation highlights with hover popovers, and navigate from a sources panel. Wrapped in a full editor workspace with a custom toolbar, activity panel, comments, tracked changes, custom commands, import, and export.",
     "category": "Editor",
     "sourceRepo": "superdoc-dev/superdoc",
     "sourcePath": "demos/custom-ui",
