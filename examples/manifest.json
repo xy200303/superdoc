@@ -140,6 +140,16 @@
     "ci": false
   },
   {
+    "id": "document-api-metadata-anchors",
+    "title": "Metadata anchors",
+    "category": "Document API",
+    "surface": "Metadata anchors",
+    "sourceRepo": "superdoc-dev/superdoc",
+    "sourcePath": "examples/document-api/metadata-anchors",
+    "docs": "https://docs.superdoc.dev/document-api/features/anchored-metadata",
+    "ci": false
+  },
+  {
     "id": "editor-theming",
     "title": "Theming",
     "category": "Editor",
