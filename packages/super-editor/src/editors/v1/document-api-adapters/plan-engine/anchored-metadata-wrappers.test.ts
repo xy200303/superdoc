@@ -283,6 +283,7 @@ describe('anchored metadata wrappers', () => {
     });
     const doc = createNode('doc', [paragraph], { isBlock: false });
     const editor = makeEditor(doc);
+    seedPayload(editor, 'customXml/item1.xml', 'urn:test:metadata', [{ id: 'meta-1', json: '{"label":"Alpha"}' }]);
 
     expect(metadataResolveWrapper(editor, { id: 'meta-1' })).toEqual({
       id: 'meta-1',
@@ -293,4 +294,60 @@ describe('anchored metadata wrappers', () => {
       },
     });
   });
+
+  it('returns null when the SDT tag has no matching payload entry (foreign content control with same w:tag)', () => {
+    // Imported DOCX with an inline SDT whose `w:tag === 'meta-1'` but no
+    // customXml payload entry — could be a Word-authored content control
+    // that happens to share an id with what a consumer would `attach`.
+    // Both halves of the anchor must agree before `resolve` reports the
+    // id resolves, otherwise UIs that trust `resolve` could be steered
+    // at an unrelated control.
+    const sdt = createNode('structuredContent', [createNode('text', [], { text: 'Hello' })], {
+      attrs: { id: '100', tag: 'meta-1' },
+      isInline: true,
+      isBlock: false,
+      inlineContent: true,
+    });
+    const paragraph = createNode('paragraph', [sdt], {
+      attrs: { sdBlockId: 'p1' },
+      isBlock: true,
+      inlineContent: true,
+    });
+    const doc = createNode('doc', [paragraph], { isBlock: false });
+    const editor = makeEditor(doc);
+    // Intentionally no seedPayload call — convertedXml stays empty.
+
+    expect(metadataResolveWrapper(editor, { id: 'meta-1' })).toBeNull();
+  });
 });
+
+/**
+ * Seed a metadata customXml part directly on the editor's converter.
+ * Lets tests that pre-seed an SDT in the doc (without going through
+ * `metadataAttachWrapper`) also wire up the payload side so the
+ * `metadata.resolve` / `metadata.get` payload gate can find an entry.
+ */
+function seedPayload(
+  editor: Editor,
+  partName: string,
+  namespace: string,
+  entries: Array<{ id: string; json: string }>,
+): void {
+  const convertedXml = (editor as unknown as { converter: { convertedXml: Record<string, unknown> } }).converter
+    .convertedXml;
+  convertedXml[partName] = {
+    elements: [
+      {
+        type: 'element',
+        name: 'refs',
+        attributes: { xmlns: namespace },
+        elements: entries.map((entry) => ({
+          type: 'element',
+          name: 'ref',
+          attributes: { id: entry.id, encoding: 'json' },
+          elements: [{ type: 'text', text: entry.json }],
+        })),
+      },
+    ],
+  };
+}

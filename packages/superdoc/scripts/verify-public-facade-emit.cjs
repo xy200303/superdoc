@@ -268,6 +268,7 @@ const FACADE_ENTRIES = [
       'DynamicCommandHandle',
       'EntityAddress',
       'EqualityFn',
+      'MetadataHandle',
       'Receipt',
       'ScrollIntoViewInput',
       'ScrollIntoViewOutput',

@@ -437,6 +437,15 @@ export function metadataResolveWrapper(
   editor: Editor,
   input: AnchoredMetadataResolveInput,
 ): AnchoredMetadataResolveInfo | null {
+  // An inline SDT's `w:tag` is not reserved for anchored metadata —
+  // an imported DOCX can carry foreign content controls whose tag
+  // happens to match a metadata id. Require both halves of the
+  // anchor (the SDT in the body and the payload entry in a customXml
+  // part) to agree before reporting the id resolves, so callers that
+  // trust `resolve` (including `ui.metadata.*`) cannot be steered at
+  // an unrelated control. Mirrors what `metadata.get` already does
+  // for payload reads.
+  if (!hasPayloadEntry(getConvertedXml(editor), input.id)) return null;
   const target = resolveAnchorTarget(editor, input.id);
   return target ? { id: input.id, target } : null;
 }
