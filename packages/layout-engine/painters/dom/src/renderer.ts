@@ -54,13 +54,13 @@ import type {
   ResolvedImageItem,
   ResolvedDrawingItem,
   ResolvedListMarkerItem,
-  LAYOUT_BOUNDARY_SCHEMA,
-  buildLayoutSourceIdentityForFragment,
-  type LayoutSourceIdentity,
-  type LayoutStoryLocator
+  LayoutSourceIdentity,
+  LayoutStoryLocator,
 } from '@superdoc/contracts';
 import {
+  LAYOUT_BOUNDARY_SCHEMA,
   adjustAvailableWidthForTextIndent,
+  buildLayoutSourceIdentityForFragment,
   calculateJustifySpacing,
   computeLinePmRange,
   expandRunsForInlineNewlines,
