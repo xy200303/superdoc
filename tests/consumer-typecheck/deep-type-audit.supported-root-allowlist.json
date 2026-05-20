@@ -1,7 +1,7 @@
 {
   "version": 1,
   "scope": "supported-root",
-  "generatedAt": "2026-05-20T19:46:50.387Z",
+  "generatedAt": "2026-05-20T23:24:35.021Z",
   "entries": [
     {
       "key": "index|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Editor.<value>.new(options)<0>.extensions[].editor.converter[string]|converter: SuperConverter;",
@@ -564,276 +564,6 @@
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
     {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.emitCommand(__0).argument|argument?: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.emitCommand(__0).argument",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 581,
-      "snippet": "argument?: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.emitCommand(__0).option|option?: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.emitCommand(__0).option",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 585,
-      "snippet": "option?: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.isDev|isDev: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.isDev",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 140,
-      "snippet": "isDev: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.superdoc|superdoc: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.superdoc",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 141,
-      "snippet": "superdoc: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.toolbarContainer|toolbarContainer: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.toolbarContainer",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 143,
-      "snippet": "toolbarContainer: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].argument.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].argument.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 434,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].childItem.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].childItem.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 446,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].command(arg0).argument|argument?: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].command(arg0).argument",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 581,
-      "snippet": "argument?: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].command(arg0).option|option?: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].command(arg0).option",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 585,
-      "snippet": "option?: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].defaultLabel.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].defaultLabel.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 482,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].dropdownStyles.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].dropdownStyles.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 464,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].dropdownValueKey.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].dropdownValueKey.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 530,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].icon.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].icon.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 364,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].iconColor.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].iconColor.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 452,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].inputRef.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].inputRef.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 542,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].label.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].label.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 488,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].labelAttr.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].labelAttr.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 518,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].markName.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].markName.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 512,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].minWidth.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].minWidth.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 428,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].parentItem.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].parentItem.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 440,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].selectedValue.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].selectedValue.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 536,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].style.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].style.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 410,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].tooltip.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].tooltip.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 370,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].tooltipTimeout.value|value: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].tooltipTimeout.value",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 476,
-      "snippet": "value: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.isDev|isDev: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.isDev",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 140,
-      "snippet": "isDev: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.superdoc|superdoc: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.superdoc",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 141,
-      "snippet": "superdoc: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "property|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.toolbarContainer|toolbarContainer: any;",
-      "kind": "property",
-      "symbolPath": "SuperDoc.toolbar.toolbarContainer",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 143,
-      "snippet": "toolbarContainer: any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
       "key": "property|node_modules/superdoc/dist/superdoc/src/components/CommentsLayer/commentsList/super-comments-list.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.commentsList.element|element: any;",
       "kind": "property",
       "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.commentsList.element",
@@ -874,26 +604,6 @@
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
     {
-      "key": "return|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.emitCommand=>return|emitCommand({ item, argument, option }: CommandItem): any;",
-      "kind": "return",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.emitCommand=>return",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 229,
-      "snippet": "emitCommand({ item, argument, option }: CommandItem): any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "return|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.emitCommand=>return|emitCommand({ item, argument, option }: CommandItem): any;",
-      "kind": "return",
-      "symbolPath": "SuperDoc.toolbar.emitCommand=>return",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 229,
-      "snippet": "emitCommand({ item, argument, option }: CommandItem): any;",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
       "key": "return|node_modules/superdoc/dist/super-editor/src/editors/v1/core/helpers/getActiveFormatting.d.ts|getActiveFormatting.<value>=>return|export function getActiveFormatting(editor: any): any;",
       "kind": "return",
       "symbolPath": "getActiveFormatting.<value>=>return",
@@ -914,92 +624,12 @@
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
     {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.overflowItems<0>|overflowItems: any[];",
-      "kind": "type",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.overflowItems<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 139,
-      "snippet": "overflowItems: any[];",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.overflowItems[]|overflowItems: any[];",
-      "kind": "type",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.overflowItems[]",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 139,
-      "snippet": "overflowItems: any[];",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
       "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.toolbar<14>|toolbar: import('vue').ComponentPublicInstance<{}, {}, {}, {}, {}, {}, {}, {}, false, import('vue').ComponentOptionsBase<any, any, any, any, any, any, any, any, any, {}, {}, string, {}, {}, {}, string",
       "kind": "type",
       "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.toolbar<14>",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 173,
+      "line": 189,
       "snippet": "toolbar: import('vue').ComponentPublicInstance<{}, {}, {}, {}, {}, {}, {}, {}, false, import('vue').ComponentOptionsBase<any, any, any, any, any, any, any, any, any, {}, {}, string, {}, {}, {}, string",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.toolbarItems<0>|toolbarItems: any[];",
-      "kind": "type",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.toolbarItems<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 138,
-      "snippet": "toolbarItems: any[];",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.toolbarItems[]|toolbarItems: any[];",
-      "kind": "type",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.toolbar.toolbarItems[]",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 138,
-      "snippet": "toolbarItems: any[];",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].nestedOptions.value<0>|value: any[];",
-      "kind": "type",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].nestedOptions.value<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 404,
-      "snippet": "value: any[];",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.config.customButtons[].nestedOptions.value[]|value: any[];",
-      "kind": "type",
-      "symbolPath": "SuperDoc.toolbar.config.customButtons[].nestedOptions.value[]",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 404,
-      "snippet": "value: any[];",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.overflowItems<0>|overflowItems: any[];",
-      "kind": "type",
-      "symbolPath": "SuperDoc.toolbar.overflowItems<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 139,
-      "snippet": "overflowItems: any[];",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.overflowItems[]|overflowItems: any[];",
-      "kind": "type",
-      "symbolPath": "SuperDoc.toolbar.overflowItems[]",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 139,
-      "snippet": "overflowItems: any[];",
       "owner": "tier-2-toolbar",
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
@@ -1008,28 +638,8 @@
       "kind": "type",
       "symbolPath": "SuperDoc.toolbar.toolbar<14>",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 173,
+      "line": 189,
       "snippet": "toolbar: import('vue').ComponentPublicInstance<{}, {}, {}, {}, {}, {}, {}, {}, false, import('vue').ComponentOptionsBase<any, any, any, any, any, any, any, any, any, {}, {}, string, {}, {}, {}, string",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.toolbarItems<0>|toolbarItems: any[];",
-      "kind": "type",
-      "symbolPath": "SuperDoc.toolbar.toolbarItems<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 138,
-      "snippet": "toolbarItems: any[];",
-      "owner": "tier-2-toolbar",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts|SuperDoc.toolbar.toolbarItems[]|toolbarItems: any[];",
-      "kind": "type",
-      "symbolPath": "SuperDoc.toolbar.toolbarItems[]",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/components/toolbar/super-toolbar.d.ts",
-      "line": 138,
-      "snippet": "toolbarItems: any[];",
       "owner": "tier-2-toolbar",
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
