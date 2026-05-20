@@ -257,12 +257,14 @@ export type HeadlessToolbarSuperdocHost = {
   toggleFormattingMarks?: () => void;
   on?: (event: string, listener: (...args: any[]) => void) => void;
   off?: (event: string, listener: (...args: any[]) => void) => void;
-  superdocStore?: {
-    documents?: Array<{
-      getPresentationEditor?: () => PresentationEditor | null | undefined;
-      getEditor?: () => Editor | null | undefined;
-    }>;
-  };
+  // SD-3213f: narrow public methods replacing the legacy
+  // `superdocStore.documents[]` and `commentsStore.getComment` reach.
+  // SuperDoc satisfies these; custom host stubs may provide them too.
+  // The internal `resolveToolbarSources` parameter type still accepts
+  // a `superdocStore` shape as a legacy fallback for custom hosts that
+  // mirror the pre-SD-3213f integration pattern.
+  getPresentationEditorForDocument?: (documentId: string) => PresentationEditor | null;
+  getComment?: (commentId: string) => Record<string, unknown> | null;
 };
 
 export type CreateHeadlessToolbarOptions = {
