@@ -157,25 +157,81 @@ finding with its `reachedFrom` and `rootBuckets` sets, so downstream
 tooling (e.g. PR 3's strict-scope selector) does not need to re-run the
 walker.
 
+## Supported-root strict gate (SD-3213e)
+
+The first real public-contract no-new-any gate. Filters findings to the
+subset whose `rootBuckets` includes `supported-root` (i.e. reached from
+root entry `.` via an export that the SD-3212 classification labels as
+supported public API) and compares them against a committed allowlist.
+
+- Allowlist file: `tests/consumer-typecheck/deep-type-audit.supported-root-allowlist.json`.
+- **The allowlist is current known debt, not accepted API quality.**
+  Drain PRs reduce it; the gate fails on stale entries to force the
+  reduction to be recorded.
+- Excludes `legacy-root`, `internal-candidate`, and raw `./super-editor`
+  reach. Each has its own drain story (legacy = compat, internal-candidate
+  = should be hidden, raw = redesign) and would obscure the
+  supported-root signal if mixed in.
+- CI invokes one command (`--strict-supported-root`) that prints the
+  broad inventory AND runs the gate. No second workflow step.
+- Top offender files + symbols are printed on every run so drain PRs
+  know where to start.
+
+```bash
+# CI invocation: broad report + supported-root strict gate, one process.
+node tests/consumer-typecheck/deep-type-audit.mjs --strict-supported-root
+
+# Seed or regenerate the supported-root allowlist (after a drain or
+# when seeding for the first time).
+node tests/consumer-typecheck/deep-type-audit.mjs --pack --write --strict-supported-root
+```
+
+## Gate map (which gate owns what)
+
+Multiple gates run against the public surface; each owns a distinct
+failure class. Before adding a new gate, check whether one of these
+already covers the concern.
+
+| Gate | Owns |
+|---|---|
+| `typecheck-matrix.mjs` | Consumer `tsc --noEmit` across module modes (Bundler / Node16 / NodeNext). Catches **resolution errors and missing exports**. |
+| `deep-type-audit.mjs` | Recursive `any` detection on every type reachable from public exports. Owns the **supported-root strict gate** (`--strict-supported-root`). |
+| `package-shape-gate.mjs` | `publint` + `attw --pack`. Catches **manifest issues**: condition ordering, masquerading ESM, missing CDN files, unpublished `source` paths. |
+| `snapshot.mjs` | Drift detection on three export inventories (super-editor package keys, legacy subpath resolved exports, root 4-source inventory). Catches **silent surface growth**. |
+| `check-root-classification-closure.mjs` | Dependency-closure rule: no `supported-root` or `legacy-root` export references an `internal-candidate` type in its declared public type. |
+| `verify-public-facade-emit.cjs` | Curated `src/public/**` facade ↔ emitted `.d.ts` parity (symbol set, ESM/CJS parity, leak grep, command signatures). Runs at postbuild. |
+| `audit-declarations.cjs` | Private workspace specifier leaks (`@superdoc/*`) and declaration-emit hygiene. Runs at postbuild. |
+
+Each gate runs once. PRs should extend an existing gate before adding
+a new one — see SD-3213e (PR which added the supported-root mode to
+the existing `deep-type-audit.mjs` rather than introducing a new
+script).
+
 ## Commands
 
 ```bash
 # Default: report-only inventory. Prints findings, always exits 0
-# (unless the script itself errors). Used by CI today.
+# (unless the script itself errors).
 node tests/consumer-typecheck/deep-type-audit.mjs
 
 # Pack + install superdoc into the fixture, then run inventory
 node tests/consumer-typecheck/deep-type-audit.mjs --pack
 
-# Strict mode: fails on findings if no allowlist exists, or on
-# new/stale entries if an allowlist exists. NOT used in CI today;
-# becomes the gate once the audit is scoped to the curated facade
-# entries (SD-3213 follow-up).
+# Supported-root strict gate (CI). Prints broad inventory AND fails on
+# new/stale entries in the supported-root allowlist.
+node tests/consumer-typecheck/deep-type-audit.mjs --strict-supported-root
+
+# Broad strict mode: fails on findings against the broad allowlist.
+# Not used in CI yet — the broad allowlist would be ~1.8k entries
+# dominated by legacy reach. Reserved for future work.
 node tests/consumer-typecheck/deep-type-audit.mjs --strict
 
-# Seed or regenerate deep-type-audit.allowlist.json from current findings
-# (intended for use once the audit is scoped to the curated facade)
+# Seed or regenerate the broad allowlist.
 node tests/consumer-typecheck/deep-type-audit.mjs --write
+
+# Seed or regenerate the supported-root allowlist (run after a drain
+# PR to shrink the baseline).
+node tests/consumer-typecheck/deep-type-audit.mjs --pack --write --strict-supported-root
 ```
 
 ## Updating the allowlist

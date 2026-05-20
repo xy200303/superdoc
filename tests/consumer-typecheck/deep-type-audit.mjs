@@ -17,10 +17,13 @@
  *     for visibility but does not block CI on its own.
  *
  * Run:
- *   node deep-type-audit.mjs                # check against allowlist (CI mode)
- *   node deep-type-audit.mjs --pack         # pack+install before checking
- *   node deep-type-audit.mjs --write        # regenerate allowlist from current findings
- *   node deep-type-audit.mjs --report-only  # print findings, never fail
+ *   node deep-type-audit.mjs                          # report-only inventory (default)
+ *   node deep-type-audit.mjs --pack                   # pack+install before running
+ *   node deep-type-audit.mjs --strict-supported-root  # CI gate (SD-3213e)
+ *   node deep-type-audit.mjs --strict                 # broad strict mode (not in CI)
+ *   node deep-type-audit.mjs --write                  # regenerate broad allowlist
+ *   node deep-type-audit.mjs --pack --write --strict-supported-root
+ *                                                     # regenerate supported-root allowlist
  *
  * The fixture is intentionally outside the pnpm workspace so this audits
  * the customer-visible surface, not workspace symlinks. Install pattern
@@ -50,10 +53,17 @@ const doWrite = args.has('--write');
 // facade entries (SD-3213 follow-up), strict-on-everything would gate
 // on ~1.8k findings dominated by legacy reach.
 const doStrict = args.has('--strict');
+// SD-3213e: scoped strict gate. Filters findings to the supported-root
+// subset (rootBuckets includes 'supported-root') and compares against
+// `deep-type-audit.supported-root-allowlist.json`. Fails on new findings
+// (regression) AND stale entries (a drain landed; allowlist must shrink).
+// Orthogonal to `--strict` and `--pack`. Wired into CI as the first real
+// no-new-any gate for the public contract.
+const doStrictSupportedRoot = args.has('--strict-supported-root');
 // Legacy alias: previous versions exposed `--report-only` as the way to
 // opt out of failing CI. The default is now report-only, so this flag
 // becomes a no-op (kept so existing invocations don't break).
-const reportOnly = args.has('--report-only') || !doStrict;
+const reportOnly = args.has('--report-only') || (!doStrict && !doStrictSupportedRoot);
 
 // -- Optional pack + install (must run BEFORE requiring typescript so a
 // fresh checkout where tests/consumer-typecheck/node_modules is empty can
@@ -506,6 +516,35 @@ for (const [key, f] of distinctFindings) {
 }
 const staleAllowlistKeys = [...remainingAllowlist];
 
+// SD-3213e: supported-root scoped gate. The broad allowlist above tracks
+// everything; this scoped one tracks ONLY findings reachable from root
+// '.' whose top-level symbol is classified as `supported-root`. That is
+// the subset that directly affects documented consumer IntelliSense.
+// Legacy-root, internal-candidate, and raw `./super-editor` reach are
+// intentionally excluded from this first strict gate; each has its own
+// drain story (legacy = compat, internal-candidate = should be hidden,
+// raw = redesign).
+const supportedRootAllowlistPath = resolve(here, 'deep-type-audit.supported-root-allowlist.json');
+const supportedRootAllowlist = existsSync(supportedRootAllowlistPath)
+  ? JSON.parse(readFileSync(supportedRootAllowlistPath, 'utf8'))
+  : { version: 1, generatedAt: null, entries: [] };
+const supportedRootAllowlistByKey = new Map(supportedRootAllowlist.entries.map((e) => [e.key, e]));
+
+const supportedRootFindings = new Map();
+for (const [key, f] of distinctFindings) {
+  if (f.rootBuckets.has('supported-root')) supportedRootFindings.set(key, f);
+}
+const newSupportedRoot = [];
+const remainingSupportedRoot = new Set(supportedRootAllowlistByKey.keys());
+for (const [key, f] of supportedRootFindings) {
+  if (supportedRootAllowlistByKey.has(key)) {
+    remainingSupportedRoot.delete(key);
+  } else {
+    newSupportedRoot.push({ key, ...f });
+  }
+}
+const staleSupportedRootKeys = [...remainingSupportedRoot];
+
 // -- Owner classification helper (used when seeding the allowlist) ---------
 function classifyOwner(f) {
   if (f.owner === 'upstream') return 'upstream';
@@ -523,7 +562,34 @@ function classifyOwner(f) {
 }
 
 // -- Write mode -----------------------------------------------------------
+// `--write` interacts with the scope flag: with `--strict-supported-root`,
+// it regenerates only the supported-root allowlist; otherwise it
+// regenerates the broad allowlist.
 if (doWrite) {
+  if (doStrictSupportedRoot) {
+    const sorted = [...supportedRootFindings.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    const next = {
+      version: 1,
+      scope: 'supported-root',
+      generatedAt: new Date().toISOString(),
+      entries: sorted.map(([key, f]) => {
+        const existing = supportedRootAllowlistByKey.get(key);
+        return {
+          key,
+          kind: f.kind,
+          symbolPath: f.symbolPath,
+          file: f.file,
+          line: f.line,
+          snippet: f.snippet,
+          owner: existing?.owner ?? classifyOwner(f),
+          rationale: existing?.rationale ?? `auto-seeded from inventory (supported-root scope)`,
+        };
+      }),
+    };
+    writeFileSync(supportedRootAllowlistPath, JSON.stringify(next, null, 2) + '\n');
+    console.log(`[audit] Wrote supported-root allowlist with ${next.entries.length} entries to ${relative(repoRoot, supportedRootAllowlistPath)}`);
+    process.exit(0);
+  }
   const sorted = [...distinctFindings.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const next = {
     version: 1,
@@ -670,15 +736,89 @@ if (haveAllowlist) {
   }
 } else {
   console.log(``);
-  console.log(`[audit] No allowlist present (deep-type-audit.allowlist.json).`);
-  console.log(`[audit] Inventory-only mode. The facade landed in SD-3212 PR C, but the audit still walks broad legacy surfaces (e.g. ./super-editor),`);
-  console.log(`[audit] so a strict allowlist isn't seeded yet. Tracked under SD-3213 follow-up: scope to curated facade entries, then make strict.`);
+  console.log(`[audit] No broad allowlist present (deep-type-audit.allowlist.json).`);
+  console.log(`[audit] The supported-root strict gate runs separately (--strict-supported-root); see the [supported-root] section below.`);
 }
 
-if (!doStrict) {
+// SD-3213e: supported-root strict gate report. Always print when there
+// is a supported-root allowlist, regardless of mode, so reviewers see
+// drain progress and top offenders even in report-only runs.
+const haveSupportedRootAllowlist = existsSync(supportedRootAllowlistPath);
+if (haveSupportedRootAllowlist) {
   console.log(``);
-  console.log(`[audit] PASS (report-only mode; pass --strict to gate CI on findings)`);
+  console.log(`[audit] [supported-root] Allowlist (current debt): ${supportedRootAllowlist.entries.length} entries`);
+  console.log(`[audit] [supported-root] Current findings: ${supportedRootFindings.size}`);
+  console.log(`[audit] [supported-root] New (not in allowlist): ${newSupportedRoot.length}`);
+  console.log(`[audit] [supported-root] Stale (in allowlist, drained): ${staleSupportedRootKeys.length}`);
+
+  // Top offenders: which files contribute the most to remaining debt. Drain
+  // PRs should start from here. Counts come from the CURRENT findings set
+  // (not the allowlist) so newly-introduced files surface too.
+  const offenderByFile = {};
+  const offenderBySymbol = {};
+  for (const f of supportedRootFindings.values()) {
+    offenderByFile[f.file] = (offenderByFile[f.file] ?? 0) + 1;
+    const top = (f.symbolPath.match(/^([^.([<=]+)/) ?? [])[1] ?? '?';
+    offenderBySymbol[top] = (offenderBySymbol[top] ?? 0) + 1;
+  }
+  console.log(``);
+  console.log(`[audit] [supported-root] Top offender files (drain targets):`);
+  for (const [k, v] of Object.entries(offenderByFile).sort((a, b) => b[1] - a[1]).slice(0, 5)) {
+    console.log(`  ${v.toString().padStart(5)}  ${k}`);
+  }
+  console.log(``);
+  console.log(`[audit] [supported-root] Top offender root symbols:`);
+  for (const [k, v] of Object.entries(offenderBySymbol).sort((a, b) => b[1] - a[1]).slice(0, 5)) {
+    console.log(`  ${v.toString().padStart(5)}  ${k}`);
+  }
+
+  if (newSupportedRoot.length > 0) {
+    console.log(``);
+    console.log(`[audit] [supported-root] NEW FINDINGS (regression):`);
+    for (const f of newSupportedRoot.slice(0, 50)) {
+      console.log(`  + ${f.kind}  ${f.symbolPath}`);
+      console.log(`        ${f.file}:${f.line}`);
+      console.log(`        ${f.snippet}`);
+    }
+    if (newSupportedRoot.length > 50) console.log(`  ... and ${newSupportedRoot.length - 50} more`);
+  }
+  if (staleSupportedRootKeys.length > 0) {
+    console.log(``);
+    console.log(`[audit] [supported-root] STALE (drain landed; allowlist must shrink):`);
+    for (const k of staleSupportedRootKeys.slice(0, 50)) {
+      const e = supportedRootAllowlistByKey.get(k);
+      console.log(`  - ${e.kind}  ${e.symbolPath}  (${e.file}:${e.line})`);
+    }
+    if (staleSupportedRootKeys.length > 50) console.log(`  ... and ${staleSupportedRootKeys.length - 50} more`);
+  }
+}
+
+if (!doStrict && !doStrictSupportedRoot) {
+  console.log(``);
+  console.log(`[audit] PASS (report-only mode; pass --strict or --strict-supported-root to gate CI on findings)`);
   process.exit(0);
+}
+
+if (doStrictSupportedRoot) {
+  if (!haveSupportedRootAllowlist && supportedRootFindings.size > 0) {
+    console.log(``);
+    console.log(`[audit] FAIL (--strict-supported-root): no supported-root allowlist exists yet but findings are present.`);
+    console.log(`[audit] - To seed the allowlist, run: node deep-type-audit.mjs --pack --write --strict-supported-root`);
+    process.exit(1);
+  }
+  if (haveSupportedRootAllowlist && (newSupportedRoot.length > 0 || staleSupportedRootKeys.length > 0)) {
+    console.log(``);
+    console.log(`[audit] FAIL (--strict-supported-root)`);
+    console.log(`[audit] - The allowlist is current known debt, not accepted API. New entries are regressions.`);
+    console.log(`[audit] - Stale entries mean a drain landed; the allowlist must shrink (run --write to regenerate).`);
+    console.log(`[audit] - To accept an intentional new finding (rare), run: node deep-type-audit.mjs --pack --write --strict-supported-root`);
+    process.exit(1);
+  }
+  if (!doStrict) {
+    console.log(``);
+    console.log(`[audit] PASS (--strict-supported-root)`);
+    process.exit(0);
+  }
 }
 
 if (haveAllowlist && (newFindings.length > 0 || staleAllowlistKeys.length > 0)) {
