@@ -610,6 +610,29 @@ const scenarios = [
     files: ['src/whiteboard-events.ts'],
     mustPass: true,
   },
+  // SD-3213: getStarterExtensions / getRichTextExtensions return
+  // EditorExtension[], not any[]. Runtime takes no arguments; the
+  // previous hand-written .d.ts was wrong on both sides.
+  {
+    name: 'bundler / extensions helpers (SD-3213)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/extensions-helpers.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / extensions helpers (SD-3213)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/extensions-helpers.ts'],
+    mustPass: true,
+  },
   // SD-3213 sub 2: ProseMirror generic defaults on Editor + Node
   // public surface. `Editor.schema` becomes `Schema<string, string>`,
   // `Editor.registerPlugin<PluginState>(plugin)` preserves the state

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "scope": "supported-root",
-  "generatedAt": "2026-05-21T14:49:39.177Z",
+  "generatedAt": "2026-05-21T16:00:16.417Z",
   "entries": [
     {
       "key": "index|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Editor.<value>.new(options)<0>.extensions[].editor.converter[string]|converter: SuperConverter;",
@@ -104,6 +104,26 @@
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
     {
+      "key": "index|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|getRichTextExtensions.<value>=>return[].editor.converter[string]|converter: SuperConverter;",
+      "kind": "index",
+      "symbolPath": "getRichTextExtensions.<value>=>return[].editor.converter[string]",
+      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
+      "line": 154,
+      "snippet": "converter: SuperConverter;",
+      "owner": "tier-5-other",
+      "rationale": "auto-seeded from inventory (supported-root scope)"
+    },
+    {
+      "key": "index|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|getRichTextExtensions.<value>=>return[].editor.extensionService[string]|extensionService: ExtensionService;",
+      "kind": "index",
+      "symbolPath": "getRichTextExtensions.<value>=>return[].editor.extensionService[string]",
+      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
+      "line": 104,
+      "snippet": "extensionService: ExtensionService;",
+      "owner": "tier-5-other",
+      "rationale": "auto-seeded from inventory (supported-root scope)"
+    },
+    {
       "key": "index|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|getSchemaIntrospection.<value>(options).editor.converter[string]|converter: SuperConverter;",
       "kind": "index",
       "symbolPath": "getSchemaIntrospection.<value>(options).editor.converter[string]",
@@ -117,6 +137,26 @@
       "key": "index|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|getSchemaIntrospection.<value>(options).editor.extensionService[string]|extensionService: ExtensionService;",
       "kind": "index",
       "symbolPath": "getSchemaIntrospection.<value>(options).editor.extensionService[string]",
+      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
+      "line": 104,
+      "snippet": "extensionService: ExtensionService;",
+      "owner": "tier-5-other",
+      "rationale": "auto-seeded from inventory (supported-root scope)"
+    },
+    {
+      "key": "index|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|getStarterExtensions.<value>=>return[].editor.converter[string]|converter: SuperConverter;",
+      "kind": "index",
+      "symbolPath": "getStarterExtensions.<value>=>return[].editor.converter[string]",
+      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
+      "line": 154,
+      "snippet": "converter: SuperConverter;",
+      "owner": "tier-5-other",
+      "rationale": "auto-seeded from inventory (supported-root scope)"
+    },
+    {
+      "key": "index|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|getStarterExtensions.<value>=>return[].editor.extensionService[string]|extensionService: ExtensionService;",
+      "kind": "index",
+      "symbolPath": "getStarterExtensions.<value>=>return[].editor.extensionService[string]",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
       "line": 104,
       "snippet": "extensionService: ExtensionService;",
@@ -264,6 +304,16 @@
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
     {
+      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts|getRichTextExtensions.<value>=>return[].config.renderDOM<1>|renderDOM?: MaybeGetter<DOMOutputSpec>;",
+      "kind": "type",
+      "symbolPath": "getRichTextExtensions.<value>=>return[].config.renderDOM<1>",
+      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts",
+      "line": 49,
+      "snippet": "renderDOM?: MaybeGetter<DOMOutputSpec>;",
+      "owner": "tier-5-other",
+      "rationale": "auto-seeded from inventory (supported-root scope)"
+    },
+    {
       "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts|getSchemaIntrospection.<value>(options).editor.presentationEditor.options.extensions[].config.renderDOM<1>|renderDOM?: MaybeGetter<DOMOutputSpec>;",
       "kind": "type",
       "symbolPath": "getSchemaIntrospection.<value>(options).editor.presentationEditor.options.extensions[].config.renderDOM<1>",
@@ -274,82 +324,12 @@
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
     {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts|getRichTextExtensions.<value>(args)<0>|...args: any[]",
+      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts|getStarterExtensions.<value>=>return[].config.renderDOM<1>|renderDOM?: MaybeGetter<DOMOutputSpec>;",
       "kind": "type",
-      "symbolPath": "getRichTextExtensions.<value>(args)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts",
-      "line": 1,
-      "snippet": "...args: any[]",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts|getRichTextExtensions.<value>(args)[]|...args: any[]",
-      "kind": "type",
-      "symbolPath": "getRichTextExtensions.<value>(args)[]",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts",
-      "line": 1,
-      "snippet": "...args: any[]",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts|getRichTextExtensions.<value>=>return<0>|export function getRichTextExtensions(...args: any[]): any[];",
-      "kind": "type",
-      "symbolPath": "getRichTextExtensions.<value>=>return<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts",
-      "line": 1,
-      "snippet": "export function getRichTextExtensions(...args: any[]): any[];",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts|getRichTextExtensions.<value>=>return[]|export function getRichTextExtensions(...args: any[]): any[];",
-      "kind": "type",
-      "symbolPath": "getRichTextExtensions.<value>=>return[]",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts",
-      "line": 1,
-      "snippet": "export function getRichTextExtensions(...args: any[]): any[];",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts|getStarterExtensions.<value>(args)<0>|...args: any[]",
-      "kind": "type",
-      "symbolPath": "getStarterExtensions.<value>(args)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts",
-      "line": 2,
-      "snippet": "...args: any[]",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts|getStarterExtensions.<value>(args)[]|...args: any[]",
-      "kind": "type",
-      "symbolPath": "getStarterExtensions.<value>(args)[]",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts",
-      "line": 2,
-      "snippet": "...args: any[]",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts|getStarterExtensions.<value>=>return<0>|export function getStarterExtensions(...args: any[]): any[];",
-      "kind": "type",
-      "symbolPath": "getStarterExtensions.<value>=>return<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts",
-      "line": 2,
-      "snippet": "export function getStarterExtensions(...args: any[]): any[];",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts|getStarterExtensions.<value>=>return[]|export function getStarterExtensions(...args: any[]): any[];",
-      "kind": "type",
-      "symbolPath": "getStarterExtensions.<value>=>return[]",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/extensions/index.d.ts",
-      "line": 2,
-      "snippet": "export function getStarterExtensions(...args: any[]): any[];",
+      "symbolPath": "getStarterExtensions.<value>=>return[].config.renderDOM<1>",
+      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts",
+      "line": 49,
+      "snippet": "renderDOM?: MaybeGetter<DOMOutputSpec>;",
       "owner": "tier-5-other",
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
