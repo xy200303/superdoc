@@ -1,7 +1,7 @@
 {
   "version": 1,
   "scope": "supported-root",
-  "generatedAt": "2026-05-21T16:00:16.417Z",
+  "generatedAt": "2026-05-21T17:32:34.299Z",
   "entries": [
     {
       "key": "index|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Editor.<value>.new(options)<0>.extensions[].editor.converter[string]|converter: SuperConverter;",
@@ -170,26 +170,6 @@
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/helpers/getActiveFormatting.d.ts",
       "line": 1,
       "snippet": "editor: any",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "param|node_modules/superdoc/dist/super-editor/src/editors/v1/core/super-converter/zipper.d.ts|createZip.<value>(blobs)|blobs: any",
-      "kind": "param",
-      "symbolPath": "createZip.<value>(blobs)",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/super-converter/zipper.d.ts",
-      "line": 7,
-      "snippet": "blobs: any",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "param|node_modules/superdoc/dist/super-editor/src/editors/v1/core/super-converter/zipper.d.ts|createZip.<value>(fileNames)|fileNames: any",
-      "kind": "param",
-      "symbolPath": "createZip.<value>(fileNames)",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/super-converter/zipper.d.ts",
-      "line": 7,
-      "snippet": "fileNames: any",
       "owner": "tier-5-other",
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
