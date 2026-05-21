@@ -610,6 +610,33 @@ const scenarios = [
     files: ['src/whiteboard-events.ts'],
     mustPass: true,
   },
+  // SD-3213 sub 2: ProseMirror generic defaults on Editor + Node
+  // public surface. `Editor.schema` becomes `Schema<string, string>`,
+  // `Editor.registerPlugin<PluginState>(plugin)` preserves the state
+  // type into the optional handlePlugins callback, and
+  // `NodeConfig.addPmPlugins` accepts `Plugin<unknown>[]`. Includes
+  // an EditorState.create({ schema, plugins }) round-trip to prove
+  // the narrowed types stay compatible with raw prosemirror-state.
+  {
+    name: 'bundler / editor PM generics (SD-3213)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/editor-pm-generics.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / editor PM generics (SD-3213)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/editor-pm-generics.ts'],
+    mustPass: true,
+  },
   // SD-3213 SuperDoc event map: typed payloads for the documented
   // public superdoc.on(...) events. Closed map (typos like
   // superdoc.on('reayd', ...) are TS errors). Reuses existing public

@@ -1,14 +1,14 @@
 {
   "version": 1,
   "scope": "supported-root",
-  "generatedAt": "2026-05-21T13:56:30.546Z",
+  "generatedAt": "2026-05-21T14:49:39.177Z",
   "entries": [
     {
       "key": "index|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Editor.<value>.new(options)<0>.extensions[].editor.converter[string]|converter: SuperConverter;",
       "kind": "index",
       "symbolPath": "Editor.<value>.new(options)<0>.extensions[].editor.converter[string]",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 146,
+      "line": 154,
       "snippet": "converter: SuperConverter;",
       "owner": "tier-5-other",
       "rationale": "auto-seeded from inventory (supported-root scope)"
@@ -28,7 +28,7 @@
       "kind": "index",
       "symbolPath": "Extensions.<value>.Node.new(config).editor.converter[string]",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 146,
+      "line": 154,
       "snippet": "converter: SuperConverter;",
       "owner": "tier-5-other",
       "rationale": "auto-seeded from inventory (supported-root scope)"
@@ -48,7 +48,7 @@
       "kind": "index",
       "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.activeEditor.converter[string]",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 146,
+      "line": 154,
       "snippet": "converter: SuperConverter;",
       "owner": "tier-5-other",
       "rationale": "auto-seeded from inventory (supported-root scope)"
@@ -68,7 +68,7 @@
       "kind": "index",
       "symbolPath": "SuperDoc.config.modules.links.popoverResolver(ctx).editor.converter[string]",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 146,
+      "line": 154,
       "snippet": "converter: SuperConverter;",
       "owner": "tier-5-other",
       "rationale": "auto-seeded from inventory (supported-root scope)"
@@ -88,7 +88,7 @@
       "kind": "index",
       "symbolPath": "defineNode.<value>(config).editor.converter[string]",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 146,
+      "line": 154,
       "snippet": "converter: SuperConverter;",
       "owner": "tier-5-other",
       "rationale": "auto-seeded from inventory (supported-root scope)"
@@ -108,7 +108,7 @@
       "kind": "index",
       "symbolPath": "getSchemaIntrospection.<value>(options).editor.converter[string]",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 146,
+      "line": 154,
       "snippet": "converter: SuperConverter;",
       "owner": "tier-5-other",
       "rationale": "auto-seeded from inventory (supported-root scope)"
@@ -234,272 +234,12 @@
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
     {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Editor.<value>.new(options)<0>.extensions[].editor.registerPlugin(handlePlugins)(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "Editor.<value>.new(options)<0>.extensions[].editor.registerPlugin(handlePlugins)(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Editor.<value>.new(options)<0>.extensions[].editor.registerPlugin(handlePlugins)(plugins)[]<0>|plugins: Plugin[]",
-      "kind": "type",
-      "symbolPath": "Editor.<value>.new(options)<0>.extensions[].editor.registerPlugin(handlePlugins)(plugins)[]<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugins: Plugin[]",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Editor.<value>.new(options)<0>.extensions[].editor.registerPlugin(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "Editor.<value>.new(options)<0>.extensions[].editor.registerPlugin(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Editor.<value>.new(options)<0>.extensions[].editor.schema<0>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "Editor.<value>.new(options)<0>.extensions[].editor.schema<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Editor.<value>.new(options)<0>.extensions[].editor.schema<1>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "Editor.<value>.new(options)<0>.extensions[].editor.schema<1>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Extensions.<value>.Node.new(config).editor.registerPlugin(handlePlugins)(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "Extensions.<value>.Node.new(config).editor.registerPlugin(handlePlugins)(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Extensions.<value>.Node.new(config).editor.registerPlugin(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "Extensions.<value>.Node.new(config).editor.registerPlugin(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Extensions.<value>.Node.new(config).editor.schema<0>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "Extensions.<value>.Node.new(config).editor.schema<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|Extensions.<value>.Node.new(config).editor.schema<1>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "Extensions.<value>.Node.new(config).editor.schema<1>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.activeEditor.registerPlugin(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.activeEditor.registerPlugin(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.activeEditor.schema<0>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.activeEditor.schema<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.activeEditor.schema<1>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "SuperDoc.<value>.new(config).modules.comments.permissionResolver(params).superdoc.activeEditor.schema<1>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|SuperDoc.config.modules.links.popoverResolver(ctx).editor.registerPlugin(handlePlugins)(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "SuperDoc.config.modules.links.popoverResolver(ctx).editor.registerPlugin(handlePlugins)(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|SuperDoc.config.modules.links.popoverResolver(ctx).editor.registerPlugin(handlePlugins)(plugins)[]<0>|plugins: Plugin[]",
-      "kind": "type",
-      "symbolPath": "SuperDoc.config.modules.links.popoverResolver(ctx).editor.registerPlugin(handlePlugins)(plugins)[]<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugins: Plugin[]",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|SuperDoc.config.modules.links.popoverResolver(ctx).editor.registerPlugin(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "SuperDoc.config.modules.links.popoverResolver(ctx).editor.registerPlugin(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|SuperDoc.config.modules.links.popoverResolver(ctx).editor.schema<0>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "SuperDoc.config.modules.links.popoverResolver(ctx).editor.schema<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|SuperDoc.config.modules.links.popoverResolver(ctx).editor.schema<1>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "SuperDoc.config.modules.links.popoverResolver(ctx).editor.schema<1>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|defineNode.<value>(config).editor.registerPlugin(handlePlugins)(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "defineNode.<value>(config).editor.registerPlugin(handlePlugins)(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|defineNode.<value>(config).editor.registerPlugin(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "defineNode.<value>(config).editor.registerPlugin(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|defineNode.<value>(config).editor.schema<0>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "defineNode.<value>(config).editor.schema<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|defineNode.<value>(config).editor.schema<1>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "defineNode.<value>(config).editor.schema<1>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|getSchemaIntrospection.<value>(options).editor.registerPlugin(handlePlugins)(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "getSchemaIntrospection.<value>(options).editor.registerPlugin(handlePlugins)(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|getSchemaIntrospection.<value>(options).editor.registerPlugin(plugin)<0>|plugin: Plugin",
-      "kind": "type",
-      "symbolPath": "getSchemaIntrospection.<value>(options).editor.registerPlugin(plugin)<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 446,
-      "snippet": "plugin: Plugin",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|getSchemaIntrospection.<value>(options).editor.schema<0>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "getSchemaIntrospection.<value>(options).editor.schema<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts|getSchemaIntrospection.<value>(options).editor.schema<1>|schema: Schema;",
-      "kind": "type",
-      "symbolPath": "getSchemaIntrospection.<value>(options).editor.schema<1>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Editor.d.ts",
-      "line": 113,
-      "snippet": "schema: Schema;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
       "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts|Editor.<value>.new(options)<0>.extensions[].config.renderDOM<1>|renderDOM?: MaybeGetter<DOMOutputSpec>;",
       "kind": "type",
       "symbolPath": "Editor.<value>.new(options)<0>.extensions[].config.renderDOM<1>",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts",
       "line": 49,
       "snippet": "renderDOM?: MaybeGetter<DOMOutputSpec>;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts|Extensions.<value>.Node.new(config).editor.presentationEditor.options.extensions[].config.addPmPlugins[]<0>|addPmPlugins?: MaybeGetter<Plugin[]>;",
-      "kind": "type",
-      "symbolPath": "Extensions.<value>.Node.new(config).editor.presentationEditor.options.extensions[].config.addPmPlugins[]<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts",
-      "line": 78,
-      "snippet": "addPmPlugins?: MaybeGetter<Plugin[]>;",
       "owner": "tier-5-other",
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
@@ -514,32 +254,12 @@
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
     {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts|defineNode.<value>(config).editor.presentationEditor.options.extensions[].config.addPmPlugins[]<0>|addPmPlugins?: MaybeGetter<Plugin[]>;",
-      "kind": "type",
-      "symbolPath": "defineNode.<value>(config).editor.presentationEditor.options.extensions[].config.addPmPlugins[]<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts",
-      "line": 78,
-      "snippet": "addPmPlugins?: MaybeGetter<Plugin[]>;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
       "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts|defineNode.<value>(config).editor.presentationEditor.options.extensions[].config.renderDOM<1>|renderDOM?: MaybeGetter<DOMOutputSpec>;",
       "kind": "type",
       "symbolPath": "defineNode.<value>(config).editor.presentationEditor.options.extensions[].config.renderDOM<1>",
       "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts",
       "line": 49,
       "snippet": "renderDOM?: MaybeGetter<DOMOutputSpec>;",
-      "owner": "tier-5-other",
-      "rationale": "auto-seeded from inventory (supported-root scope)"
-    },
-    {
-      "key": "type|node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts|getSchemaIntrospection.<value>(options).editor.presentationEditor.options.extensions[].config.addPmPlugins[]<0>|addPmPlugins?: MaybeGetter<Plugin[]>;",
-      "kind": "type",
-      "symbolPath": "getSchemaIntrospection.<value>(options).editor.presentationEditor.options.extensions[].config.addPmPlugins[]<0>",
-      "file": "node_modules/superdoc/dist/super-editor/src/editors/v1/core/Node.d.ts",
-      "line": 78,
-      "snippet": "addPmPlugins?: MaybeGetter<Plugin[]>;",
       "owner": "tier-5-other",
       "rationale": "auto-seeded from inventory (supported-root scope)"
     },
