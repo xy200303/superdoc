@@ -12,7 +12,32 @@ import { WhiteboardPage } from './WhiteboardPage';
  * or `.x` would be present (runtime gives `pointsN` / `xN`).
  *
  * @typedef {import('./WhiteboardPage.js').WhiteboardStoredPageData} WhiteboardPageData
- * @typedef {{ pages?: Record<string, WhiteboardPageData> }} WhiteboardData
+ *
+ * Per-page size snapshot recorded in `WhiteboardDataMeta.pageSizes`.
+ * `originalWidth` / `originalHeight` are `number | null` because
+ * `getWhiteboardData()` writes `page.originalSize?.width ?? null` when
+ * the original size is unknown.
+ *
+ * @typedef {{ width: number, height: number, originalWidth: number | null, originalHeight: number | null }} WhiteboardPageSizeSnapshot
+ *
+ * @typedef {{ pageSizes: Record<string, WhiteboardPageSizeSnapshot> }} WhiteboardDataMeta
+ *
+ * `WhiteboardData` is the **output** shape: what `getWhiteboardData()`
+ * returns and what the `change` event payload carries. All three
+ * fields are required because the runtime always populates them.
+ * Consumers reading the change payload can write
+ * `data.meta.pageSizes` without optional chaining.
+ *
+ * @typedef {{ pages: Record<string, WhiteboardPageData>, meta: WhiteboardDataMeta, version: 1 }} WhiteboardData
+ *
+ * `WhiteboardDataInput` is the **input** shape accepted by
+ * `setWhiteboardData(json)`. All fields are optional because the
+ * runtime only reads `json?.pages`; callers can pass
+ * `{ pages: {...} }` without supplying `meta` or `version`. A round
+ * trip works (`setWhiteboardData(getWhiteboardData())`) because
+ * `WhiteboardData` is structurally assignable to `WhiteboardDataInput`.
+ *
+ * @typedef {{ pages?: Record<string, WhiteboardPageData>, meta?: WhiteboardDataMeta, version?: number }} WhiteboardDataInput
  *
  * Registry items the host can attach for UI palettes (stickers,
  * comments, etc.). The shape is intentionally extensible: `id` is the
@@ -21,6 +46,22 @@ import { WhiteboardPage } from './WhiteboardPage';
  * don't need a contract change.
  *
  * @typedef {{ id?: string | number, [key: string]: unknown }} WhiteboardRegistryItem
+ *
+ * Event map for `whiteboard.on(name, fn)` / `whiteboard.emit(name, ...)`.
+ * Closed map (no DefaultEventMap fallback) because every event the
+ * runtime emits is enumerated here; an unknown event name should be a
+ * type error, not an `unknown[]` payload. SD-3213 follow-up to the
+ * EventEmitter `unknown[]` drain: that change only fixed the
+ * untyped-event fallback; without this map, listeners on Whiteboard
+ * still received `unknown[]` because no event was named.
+ *
+ * @typedef {{
+ *  tool: [string],
+ *  enabled: [boolean],
+ *  opacity: [number],
+ *  setData: [WhiteboardPage[]],
+ *  change: [WhiteboardData],
+ * }} WhiteboardEventMap
  *
  * @typedef {{
  *  Renderer?: any,
@@ -34,6 +75,8 @@ import { WhiteboardPage } from './WhiteboardPage';
 
 /**
  * Whiteboard manager for multi-page annotations.
+ *
+ * @extends {EventEmitter<WhiteboardEventMap>}
  */
 export class Whiteboard extends EventEmitter {
   #Renderer = null;
@@ -243,7 +286,7 @@ export class Whiteboard extends EventEmitter {
 
   /**
    * Load whiteboard data from JSON.
-   * @param {WhiteboardData} json
+   * @param {WhiteboardDataInput} json
    */
   setWhiteboardData(json) {
     this.#pages.clear();

@@ -584,6 +584,32 @@ const scenarios = [
     files: ['src/whiteboard-data-shape.ts'],
     mustPass: true,
   },
+  // SD-3213 Whiteboard event map: pin typed payloads for
+  // whiteboard.on(name, fn) across all 5 events plus the runtime
+  // `meta` and `version` fields newly exposed on WhiteboardData.
+  // Closed event map (no DefaultEventMap fallback), so unknown event
+  // names are TS errors. Generic register/getType is a separate
+  // design decision tracked as a follow-up.
+  {
+    name: 'bundler / whiteboard events (SD-3213)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/whiteboard-events.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / whiteboard events (SD-3213)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/whiteboard-events.ts'],
+    mustPass: true,
+  },
   // SD-2867 phase B: SuperDoc.canPerformPermission forwards `comment` and
   // `trackedChange` to isAllowed() unchanged, so the public contract must
   // accept the wide payloads the editor's permission helper produces
