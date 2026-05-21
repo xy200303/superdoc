@@ -81,3 +81,21 @@ const identifier: Promise<string> = editor.converter.getDocumentIdentifier();
 void identifier;
 const _identifierIsExact: Equal<ReturnType<typeof editor.converter.getDocumentIdentifier>, Promise<string>> = true;
 void _identifierIsExact;
+
+// `exportToDocx()` at the converter level returns either the rendered
+// XML string or the intermediate xml-js JSON tree (when called with
+// `exportJsonOnly: true`). Blob / Buffer wrapping happens upstream in
+// `Editor.exportDocx()`, not on the converter. This assertion pins the
+// honest converter shape so a future regression to `any` (or back to
+// the original Blob | Buffer fiction) breaks the typecheck matrix.
+// (Note: `Editor.exportDocx({ exportJsonOnly: true })` is publicly
+// typed as `Promise<string>` but actually returns a JSON tree at
+// runtime; that overload correction is tracked separately and is
+// out of scope for SD-3240.)
+const exported: Promise<string | Record<string, unknown>> = editor.converter.exportToDocx();
+void exported;
+const _exportedIsExact: Equal<
+  ReturnType<typeof editor.converter.exportToDocx>,
+  Promise<string | Record<string, unknown>>
+> = true;
+void _exportedIsExact;
