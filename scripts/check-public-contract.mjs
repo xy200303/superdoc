@@ -1,31 +1,34 @@
 #!/usr/bin/env node
 /**
- * SD-3256 Phase 1: single command to validate the public type contract.
+ * Single command to validate the published superdoc package's public
+ * TypeScript surface end-to-end.
  *
- * Runs the validators that, together, answer "is the published
- * superdoc package's public TypeScript surface healthy?" Today these
- * run as three separate invocations across CI:
+ * Stages:
+ *   1. build:superdoc      - vite build + the postbuild validator chain
+ *                            (check-tsconfig-type-surface, ensure-types,
+ *                            audit-bundle, audit-declarations,
+ *                            check-export-coverage, verify-public-facade-emit,
+ *                            report-declaration-reachability).
+ *                            Skipped when `--skip-build` is passed (CI calls
+ *                            `pnpm run build` separately in its own step).
+ *   2. typecheck-matrix    - packs superdoc + installs the tarball into
+ *                            tests/consumer-typecheck/node_modules/, then
+ *                            runs every consumer scenario.
+ *   3. deep-type-audit     - strict gate on the supported-root public
+ *                            surface (must be 0 findings). Reuses the
+ *                            install that stage 2 produced (no `--pack`).
  *
- *   pnpm run build:superdoc
- *     # vite build + the postbuild validator chain
- *     # (check-tsconfig-type-surface, ensure-types, audit-bundle,
- *     #  audit-declarations, check-export-coverage,
- *     #  verify-public-facade-emit, report-declaration-reachability)
+ * Matrix runs BEFORE audit on purpose: matrix packs + installs the
+ * tarball once, and the audit then reuses that install. Without this
+ * order the audit would `--pack` separately and double the work.
  *
- *   node tests/consumer-typecheck/deep-type-audit.mjs --pack --strict-supported-root
- *     # strict gate on the supported public surface; must be 0 findings
- *
- *   node tests/consumer-typecheck/typecheck-matrix.mjs
- *     # consumer-perspective scenarios compiled against the packed tarball
- *
- * This wrapper orchestrates them in order, prints section headers,
- * fails fast on the first failure, and gives an at-a-glance verdict.
- * Zero behavior change for the validators themselves; this is pure DX.
- *
- * Usage:
+ * Local usage:
  *   pnpm check:public-contract
  *
- * Tracking: SD-3256 (umbrella). Phase 1.
+ * CI usage (Build step already ran):
+ *   pnpm check:public-contract --skip-build
+ *
+ * SD-3256 Phase 1 (initial wrapper) / SD-673 Phase 1 (CI wiring).
  */
 
 import { spawnSync } from 'node:child_process';
@@ -33,6 +36,9 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+const flags = new Set(process.argv.slice(2));
+const skipBuild = flags.has('--skip-build');
 
 const stages = [
   {
@@ -43,20 +49,26 @@ const stages = [
     blurb:
       'Build dist + run postbuild validators (audit-bundle, audit-declarations, ' +
       'check-export-coverage, verify-public-facade-emit, ensure-types, ...).',
-  },
-  {
-    name: 'deep-type-audit --strict-supported-root',
-    cwd: resolve(REPO_ROOT, 'tests/consumer-typecheck'),
-    cmd: 'node',
-    args: ['deep-type-audit.mjs', '--pack', '--strict-supported-root'],
-    blurb: 'Strict gate on the supported-root public surface (must be 0 findings).',
+    skipIf: skipBuild,
+    skipReason: '--skip-build passed; CI Build step already ran this',
   },
   {
     name: 'typecheck-matrix',
     cwd: resolve(REPO_ROOT, 'tests/consumer-typecheck'),
     cmd: 'node',
     args: ['typecheck-matrix.mjs'],
-    blurb: 'Consumer-perspective scenarios against the packed tarball.',
+    blurb:
+      'Packs superdoc + installs the tarball into the consumer fixture, ' +
+      'then runs every typecheck scenario.',
+  },
+  {
+    name: 'deep-type-audit --strict-supported-root',
+    cwd: resolve(REPO_ROOT, 'tests/consumer-typecheck'),
+    cmd: 'node',
+    args: ['deep-type-audit.mjs', '--strict-supported-root'],
+    blurb:
+      'Strict gate on the supported-root public surface (must be 0 findings). ' +
+      'Reuses the install produced by typecheck-matrix.',
   },
 ];
 
@@ -64,13 +76,20 @@ const HR = '='.repeat(72);
 const start = Date.now();
 
 let failed = null;
+let ranCount = 0;
 for (const [i, s] of stages.entries()) {
   console.log('');
   console.log(HR);
   console.log(`[${i + 1}/${stages.length}] ${s.name}`);
+  if (s.skipIf) {
+    console.log(`SKIP: ${s.skipReason}`);
+    console.log(HR);
+    continue;
+  }
   console.log(s.blurb);
   console.log(HR);
   const result = spawnSync(s.cmd, s.args, { cwd: s.cwd, stdio: 'inherit' });
+  ranCount += 1;
   if (result.status !== 0) {
     failed = { stage: s.name, status: result.status ?? 1 };
     break;
@@ -89,5 +108,7 @@ if (failed) {
   console.log(`  ${failedStage.cmd} ${failedStage.args.join(' ')}`);
   process.exit(failed.status);
 } else {
-  console.log(`PASS: ${stages.length} stages, ${elapsed}s`);
+  const skipped = stages.length - ranCount;
+  const ranLabel = skipped > 0 ? `${ranCount} ran, ${skipped} skipped` : `${ranCount} stages`;
+  console.log(`PASS: ${ranLabel}, ${elapsed}s`);
 }
