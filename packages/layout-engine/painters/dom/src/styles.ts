@@ -580,8 +580,7 @@ const SDT_CONTAINER_STYLES = `
   text-overflow: ellipsis;
 }
 
-.superdoc-structured-content-block.ProseMirror-selectednode .superdoc-structured-content__label,
-.superdoc-structured-content-block.sdt-group-hover:not(.ProseMirror-selectednode) .superdoc-structured-content__label {
+.superdoc-structured-content-block.ProseMirror-selectednode .superdoc-structured-content__label {
   display: inline-flex;
 }
 
@@ -642,7 +641,7 @@ const SDT_CONTAINER_STYLES = `
   outline: none;
   background-color: transparent;
 }
-/* Inline structured content label - shown on hover */
+/* Inline structured content label - shown when active */
 .superdoc-structured-content-inline__label {
   position: absolute;
   bottom: calc(100% + 2px);
