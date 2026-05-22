@@ -6116,15 +6116,20 @@ export class PresentationEditor extends EventEmitter {
           }
         }
 
+        // SD-3240: converter.convertedXml / translatedLinkedStyles /
+        // translatedNumbering are typed on the public surface as
+        // narrower (unknown-bearing) shapes than ConverterContext
+        // requires. Cast at the boundary; the runtime values match
+        // the shape ConverterContext expects.
         converterContext = converter
-          ? {
+          ? ({
               docx: converter.convertedXml,
               ...(Object.keys(footnoteNumberById).length ? { footnoteNumberById } : {}),
               ...(Object.keys(endnoteNumberById).length ? { endnoteNumberById } : {}),
               translatedLinkedStyles: converter.translatedLinkedStyles,
               translatedNumbering: converter.translatedNumbering,
               ...(defaultTableStyleId ? { defaultTableStyleId } : {}),
-            }
+            } as unknown as ConverterContext)
           : undefined;
         const atomNodeTypes = getAtomNodeTypesFromSchema(this.#editor?.schema ?? null);
         const positionMapStart = perfNow();
@@ -6143,7 +6148,10 @@ export class PresentationEditor extends EventEmitter {
           enableTrackedChanges: this.#trackedChangesEnabled,
           enableComments: commentsEnabled,
           enableRichHyperlinks: true,
-          themeColors: this.#editor?.converter?.themeColors ?? undefined,
+          // SD-3240: converter.themeColors is `unknown` on the public
+          // EditorConverterSurface; cast to the consumer-expected type
+          // here. The runtime shape matches at call time.
+          themeColors: (this.#editor?.converter?.themeColors ?? undefined) as Record<string, string> | undefined,
           converterContext,
           flowBlockCache: this.#flowBlockCache,
           showBookmarks: this.#layoutOptions.showBookmarks ?? false,

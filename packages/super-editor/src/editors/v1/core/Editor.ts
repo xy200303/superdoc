@@ -18,6 +18,7 @@ import { ExtensionService } from './ExtensionService.js';
 import { CommandService } from './CommandService.js';
 import { Attribute } from './Attribute.js';
 import { SuperConverter } from '@core/super-converter/SuperConverter.js';
+import type { EditorConverterSurface, EditorExtensionServiceSurface } from './types/EditorPublicSurfaces.js';
 import {
   Commands,
   Editable,
@@ -253,10 +254,8 @@ export class Editor extends EventEmitter<EditorEventMap> {
    */
   #commandService!: CommandService;
 
-  /**
-   * Service for managing extensions
-   */
-  extensionService!: ExtensionService;
+  /** Extension service. See `EditorExtensionServiceSurface`. SD-3240. */
+  extensionService!: EditorExtensionServiceSurface;
 
   /**
    * Storage for extension data
@@ -265,9 +264,17 @@ export class Editor extends EventEmitter<EditorEventMap> {
 
   /**
    * ProseMirror schema for the editor.
+   *
+   * Typed as `Schema<string, string>` rather than bare `Schema` to
+   * drop the implicit `Schema<any, any>` default through the SD-3213
+   * supported-root audit. Node and mark name spaces are typed as
+   * `string` (the established ProseMirror constraint shape); consumer
+   * schemas with literal-typed names like `Schema<'paragraph', 'em'>`
+   * remain assignable.
+   *
    * @deprecated Direct ProseMirror access will be removed in a future version. Use the Document API (`editor.doc`) instead.
    */
-  schema!: Schema;
+  schema!: Schema<string, string>;
 
   /**
    * ProseMirror view instance.
@@ -340,7 +347,8 @@ export class Editor extends EventEmitter<EditorEventMap> {
   /**
    * The document converter instance
    */
-  converter!: SuperConverter;
+  /** Document converter handle. See `EditorConverterSurface`. SD-3240. */
+  converter!: EditorConverterSurface;
 
   /**
    * Toolbar instance (if attached)
@@ -640,7 +648,7 @@ export class Editor extends EventEmitter<EditorEventMap> {
       if (!this.#telemetry || this.#documentOpenTracked) return;
 
       try {
-        const documentCreatedAt = this.converter?.getDocumentCreatedTimestamp?.() || null;
+        const documentCreatedAt = this.converter?.getDocumentCreatedTimestamp?.() ?? null;
         this.#telemetry.trackDocumentOpen(documentId, documentCreatedAt);
         this.#documentOpenTracked = true;
       } catch {
@@ -1100,7 +1108,14 @@ export class Editor extends EventEmitter<EditorEventMap> {
   #initProtectionState(): void {
     const protStorage = getProtectionStorage(this);
     if (!protStorage) return;
-    const settingsRoot = this.converter ? readSettingsRoot(this.converter) : null;
+    // SD-3240: readSettingsRoot accepts a narrow `ConverterWithDocumentSettings`
+    // shape that overlaps with EditorConverterSurface but uses a
+    // different `pageStyles` typing (alternateHeaders flag). Cast to
+    // the local narrow interface. Both shapes are honest no-`any`
+    // contracts on the same runtime instance.
+    const settingsRoot = this.converter
+      ? readSettingsRoot(this.converter as unknown as Parameters<typeof readSettingsRoot>[0])
+      : null;
     protStorage.state = parseProtectionState(settingsRoot);
     protStorage.initialized = true;
   }
@@ -1947,10 +1962,22 @@ export class Editor extends EventEmitter<EditorEventMap> {
 
   /**
    * Register PM plugin.
+   *
+   * `PluginState` is a call-site generic so the incoming plugin's
+   * state shape is preserved into the `handlePlugins` callback's
+   * `plugin` argument. The existing plugin list is heterogeneous
+   * (each entry can have a different state type) so it stays as
+   * `Plugin<unknown>[]` instead of being inferred under one specific
+   * state. Default `PluginState = unknown` removes the previous
+   * implicit `Plugin<any>` SD-3213 supported-root finding.
+   *
    * @param plugin PM plugin.
    * @param handlePlugins Optional function for handling plugin merge.
    */
-  registerPlugin(plugin: Plugin, handlePlugins?: (plugin: Plugin, plugins: Plugin[]) => Plugin[]): void {
+  registerPlugin<PluginState = unknown>(
+    plugin: Plugin<PluginState>,
+    handlePlugins?: (plugin: Plugin<PluginState>, plugins: Plugin<unknown>[]) => Plugin<unknown>[],
+  ): void {
     if (this.isDestroyed) return;
     if (!this.state?.plugins) return;
     const plugins =
@@ -2095,7 +2122,15 @@ export class Editor extends EventEmitter<EditorEventMap> {
 
     const isolatedExternalExtensions = externalExtensions.map((extension) => cloneExtensionInstance(extension));
 
-    this.extensionService = ExtensionService.create(allExtensions, isolatedExternalExtensions, this);
+    // SD-3240: ExtensionService.d.ts uses a `[key: string]: any` catchall
+    // for internal-implementation members. The runtime instance has the
+    // surface members; the cast bridges the structural gap without
+    // reintroducing `any` on the public field type.
+    this.extensionService = ExtensionService.create(
+      allExtensions,
+      isolatedExternalExtensions,
+      this,
+    ) as unknown as EditorExtensionServiceSurface;
   }
 
   /**
@@ -2111,8 +2146,12 @@ export class Editor extends EventEmitter<EditorEventMap> {
    * Create the document converter as this.converter.
    */
   #createConverter(): void {
+    // SD-3240: SuperConverter.d.ts uses a `[key: string]: any` catchall
+    // for internal-implementation members. The runtime instance has the
+    // surface members; the cast bridges the structural gap without
+    // reintroducing `any` on the public field type.
     if (this.options.converter) {
-      this.converter = this.options.converter as SuperConverter;
+      this.converter = this.options.converter as unknown as EditorConverterSurface;
     } else {
       this.converter = new SuperConverter({
         docx: this.options.content,
@@ -2125,7 +2164,7 @@ export class Editor extends EventEmitter<EditorEventMap> {
         mockDocument: this.options.mockDocument ?? null,
         isNewFile: this.options.isNewFile ?? false,
         trackedChangesOptions: this.options.trackedChanges ?? null,
-      });
+      }) as unknown as EditorConverterSurface;
     }
   }
 
@@ -2347,7 +2386,10 @@ export class Editor extends EventEmitter<EditorEventMap> {
 
     const suppressedNames = new Set(
       (this.extensionService?.extensions || [])
-        .filter((ext: { config?: { excludeFromSummaryJSON?: boolean } }) => {
+        .filter((ext) => {
+          // SD-3240: extension entries are typed but `excludeFromSummaryJSON`
+          // is a runtime opt-in on the config record (Options/Storage generics
+          // hide it). Cast at the read site to access the optional flag.
           const config = (ext as { config?: { excludeFromSummaryJSON?: boolean } })?.config;
           const suppressFlag = config?.excludeFromSummaryJSON;
           return Boolean(suppressFlag);
@@ -3213,7 +3255,13 @@ export class Editor extends EventEmitter<EditorEventMap> {
 
       this.#validateDocumentExport();
 
-      if (exportXmlOnly || exportJsonOnly) return documentXml;
+      // SD-3240: converter surface returns `string | Record<string, unknown>`
+      // (the JSON-only branch returns the intermediate xml-js tree).
+      // The Editor.exportDocx implementation signature here declares the
+      // outer union as `Record<string, string | null>` which is a pre-
+      // existing narrower shape than the runtime JSON tree. Cast at the
+      // bridge so the public surface stays honest.
+      if (exportXmlOnly || exportJsonOnly) return documentXml as string | Record<string, string | null>;
 
       const customXml = this.converter.schemaToXml(this.converter.convertedXml['docProps/custom.xml'].elements[0]);
       const styles = this.converter.schemaToXml(this.converter.convertedXml['word/styles.xml'].elements[0]);

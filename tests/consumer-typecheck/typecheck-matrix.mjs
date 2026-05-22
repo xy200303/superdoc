@@ -541,6 +541,203 @@ const scenarios = [
     files: ['src/superdoc-stores-private.ts'],
     mustPass: true,
   },
+  // SD-3213 EventEmitter drain: pin both sides of the intended contract.
+  // Known typed events keep precise payloads (commentsLoaded.comments
+  // is Comment[]); untyped events fall through to unknown[] not any[].
+  {
+    name: 'bundler / event-emitter contract (SD-3213)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    files: ['src/event-emitter-contract.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / event-emitter contract (SD-3213)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    files: ['src/event-emitter-contract.ts'],
+    mustPass: true,
+  },
+  // SD-3213 Whiteboard data-shape typing: pin the three contracts
+  // tightened in this PR — toJSON returns `images` not `stickers`,
+  // stored items use normalized field names (pointsN/xN/yN/widthN),
+  // and registry items expose `id` typed with `unknown` for extras.
+  {
+    name: 'bundler / whiteboard data shape (SD-3213)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    files: ['src/whiteboard-data-shape.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / whiteboard data shape (SD-3213)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    files: ['src/whiteboard-data-shape.ts'],
+    mustPass: true,
+  },
+  // SD-3213 Whiteboard event map: pin typed payloads for
+  // whiteboard.on(name, fn) across all 5 events plus the runtime
+  // `meta` and `version` fields newly exposed on WhiteboardData.
+  // Closed event map (no DefaultEventMap fallback), so unknown event
+  // names are TS errors. Generic register/getType is a separate
+  // design decision tracked as a follow-up.
+  {
+    name: 'bundler / whiteboard events (SD-3213)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/whiteboard-events.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / whiteboard events (SD-3213)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/whiteboard-events.ts'],
+    mustPass: true,
+  },
+  // SD-3213: getStarterExtensions / getRichTextExtensions return
+  // EditorExtension[], not any[]. Runtime takes no arguments; the
+  // previous hand-written .d.ts was wrong on both sides.
+  {
+    name: 'bundler / extensions helpers (SD-3213)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/extensions-helpers.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / extensions helpers (SD-3213)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/extensions-helpers.ts'],
+    mustPass: true,
+  },
+  // SD-3240 / SD-3245: editor.converter, editor.extensionService, and
+  // getActiveFormatting are typed surfaces, not `any`. Drains the final
+  // 18 supported-root allowlist entries (16 + 2) to 0. The fixture's
+  // `Equal<T, any>` checks regress the build if any of those surfaces
+  // widen back to `any`.
+  {
+    name: 'bundler / editor surfaces not any (SD-3240)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/editor-surfaces-not-any.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / editor surfaces not any (SD-3240)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/editor-surfaces-not-any.ts'],
+    mustPass: true,
+  },
+  // SD-3213: NodeConfig.renderDOM uses a local SuperDocDOMOutputSpec
+  // alias instead of PM's DOMOutputSpec (which contains
+  // `readonly [string, ...any[]]`). Pins the four consumer shapes
+  // (string, tuple with attrs+0, nested tuples, { dom, contentDOM? })
+  // plus negative assertions for bad tuple elements and non-string
+  // tagName.
+  {
+    name: 'bundler / node renderDOM (SD-3213)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/node-render-dom.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / node renderDOM (SD-3213)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/node-render-dom.ts'],
+    mustPass: true,
+  },
+  // SD-3213 sub 2: ProseMirror generic defaults on Editor + Node
+  // public surface. `Editor.schema` becomes `Schema<string, string>`,
+  // `Editor.registerPlugin<PluginState>(plugin)` preserves the state
+  // type into the optional handlePlugins callback, and
+  // `NodeConfig.addPmPlugins` accepts `Plugin<unknown>[]`. Includes
+  // an EditorState.create({ schema, plugins }) round-trip to prove
+  // the narrowed types stay compatible with raw prosemirror-state.
+  {
+    name: 'bundler / editor PM generics (SD-3213)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/editor-pm-generics.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / editor PM generics (SD-3213)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/editor-pm-generics.ts'],
+    mustPass: true,
+  },
+  // SD-3213 SuperDoc event map: typed payloads for the documented
+  // public superdoc.on(...) events. Closed map (typos like
+  // superdoc.on('reayd', ...) are TS errors). Reuses existing public
+  // types (User, Editor, AwarenessState, Comment, DocumentMode,
+  // FontsResolvedPayload, ListDefinitionsPayload, WhiteboardData).
+  // Exception payload is a union of the three current runtime shapes;
+  // normalization is a follow-up.
+  {
+    name: 'bundler / superdoc events (SD-3213)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/superdoc-events.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / superdoc events (SD-3213)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: true,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/superdoc-events.ts'],
+    mustPass: true,
+  },
   // SD-2867 phase B: SuperDoc.canPerformPermission forwards `comment` and
   // `trackedChange` to isAllowed() unchanged, so the public contract must
   // accept the wide payloads the editor's permission helper produces

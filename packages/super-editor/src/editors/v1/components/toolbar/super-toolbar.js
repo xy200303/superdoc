@@ -214,6 +214,21 @@ export class SuperToolbar extends EventEmitter {
   toolbarContainer = null;
 
   /**
+   * Mounted Vue component instance from `this.app.mount(...)`. Not
+   * consumer API: zero docs/examples reference `superdoc.toolbar.toolbar`,
+   * and no .ts or .js cross-file reader exists. The wrapper
+   * `SuperDoc.toolbar` (this class) is the documented public surface;
+   * this nested `.toolbar` field is the internal Vue mount handle.
+   *
+   * Same SD-3213f-style TS surface hide as `commentsList` and
+   * `SuperDoc.app`; not runtime privacy.
+   *
+   * @type {import('vue').ComponentPublicInstance | null}
+   * @private
+   */
+  toolbar = null;
+
+  /**
    * Creates a new SuperToolbar instance
    * @param {ToolbarConfig} config - The configuration for the toolbar
    * @returns {void}
