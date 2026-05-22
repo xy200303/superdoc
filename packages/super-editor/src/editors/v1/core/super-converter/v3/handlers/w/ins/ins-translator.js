@@ -122,8 +122,17 @@ function decode(params) {
  */
 function resolveExportWordId(params, attrs) {
   const sourceId = attrs?.sourceId;
-  const exportSourceId =
-    typeof sourceId === 'string' || typeof sourceId === 'number' || sourceId == null ? sourceId : String(sourceId);
+  /** @type {string | number | null | undefined} */
+  let exportSourceId;
+  if (typeof sourceId === 'string' || typeof sourceId === 'number') {
+    exportSourceId = sourceId;
+  } else if (sourceId === null) {
+    exportSourceId = null;
+  } else if (sourceId === undefined) {
+    exportSourceId = undefined;
+  } else {
+    exportSourceId = String(sourceId);
+  }
   const logicalId = typeof attrs?.id === 'string' ? attrs.id : '';
   const exportParams =
     /** @type {import('@translator').SCDecoderConfig & { converter?: { wordIdAllocator?: import('@extensions/track-changes/review-model/word-id-allocator.js').WordIdAllocator | null }, currentPartPath?: string, filename?: string }} */ (

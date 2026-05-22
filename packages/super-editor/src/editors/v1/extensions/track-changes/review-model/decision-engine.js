@@ -383,7 +383,7 @@ const runPermissionPreflight = ({ editor, decision, selections }) => {
 /**
  * @typedef {Object} MutationPlan
  * @property {MutationOp[]} ops Document-order op list.
- * @property {import('./comment-effects.js').CommentEffectsPlan} commentEffects
+ * @property {import('./comment-effects.js').CommentEffectsPlan & { _affectedChildren?: Array<{ changeId: string }> }} commentEffects
  * @property {Set<string>} touchedChangeIds Logical ids retired/updated by the decision.
  * @property {Set<string>} retiredChangeIds Logical ids retired by the decision (subset).
  * @property {DecisionDiagnostic[]} diagnostics
@@ -436,7 +436,6 @@ const buildMutationPlan = ({ state, graph, selections, decision, replacements })
         decision,
         removedRanges,
         retired,
-        diagnostics,
       });
       if (!partialResult.ok) return { ok: false, failure: partialResult.failure };
       for (const id of partialResult.createdChangeIds) touched.add(id);
@@ -448,7 +447,7 @@ const buildMutationPlan = ({ state, graph, selections, decision, replacements })
       const repResult = planReplacementDecision({ ops, change, decision, removedRanges, retired });
       if (!repResult.ok) return { ok: false, failure: repResult.failure };
     } else if (change.type === CanonicalChangeType.Formatting) {
-      planFormattingDecision({ ops, change, decision, retired, state });
+      planFormattingDecision({ ops, change, decision, retired });
     } else {
       return {
         ok: false,
@@ -880,6 +879,7 @@ const collectCreatedChangeIds = (plan) => {
 export const buildDecisionBubbleEvents = ({ result, editor }) => {
   const resolvedByEmail = editor?.options?.user?.email;
   const resolvedByName = editor?.options?.user?.name;
+  /** @type {Array<{ type: 'trackedChange', event: 'resolve'|'update', changeId: string, resolvedByEmail?: string, resolvedByName?: string }>} */
   const events = [];
   for (const entry of result.receipt.removedChangeIds) {
     events.push({ type: 'trackedChange', event: 'resolve', changeId: entry.id, resolvedByEmail, resolvedByName });

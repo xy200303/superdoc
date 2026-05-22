@@ -59,6 +59,7 @@ export const SegmentSide = Object.freeze({
   Formatting: 'formatting',
 });
 
+/** @type {Set<string>} */
 const CHANGE_TYPE_VALUES = new Set(Object.values(CanonicalChangeType));
 
 /**
@@ -128,6 +129,7 @@ const canonicalizeForSerialization = (value) => {
     });
   }
   if (typeof value === 'object') {
+    /** @type {Record<string, unknown>} */
     const out = {};
     const keys = Object.keys(value).sort();
     for (const key of keys) {
@@ -175,7 +177,12 @@ export const canonicalizeSourceIds = (value) => {
   return {};
 };
 
+/**
+ * @param {Record<string, unknown>} obj
+ * @returns {Record<string, unknown>}
+ */
 const canonicalSourceIdsFromObject = (obj) => {
+  /** @type {Record<string, unknown>} */
   const out = {};
   const keys = Object.keys(obj).sort();
   for (const key of keys) {

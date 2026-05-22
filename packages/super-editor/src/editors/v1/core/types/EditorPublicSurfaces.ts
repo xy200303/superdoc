@@ -16,7 +16,7 @@
  * cast at the call site (no `any`).
  */
 import type { Plugin } from 'prosemirror-state';
-import type { Schema } from 'prosemirror-model';
+import type { Node as PmNode, Schema } from 'prosemirror-model';
 import type { NodeViewConstructor } from 'prosemirror-view';
 import type { EditorHelpers } from './EditorTypes.js';
 import type { Comment } from './EditorEvents.js';
@@ -24,6 +24,7 @@ import type { EditorExtension } from './EditorConfig.js';
 import type { CommandProps } from './ChainedCommands.js';
 import type { ExtensionAttribute } from '../Attribute.js';
 import type { NumberingModel } from '../parts/adapters/numbering-transforms.js';
+import type { WordIdAllocator } from '../../extensions/track-changes/review-model/word-id-allocator.js';
 
 /**
  * Loosely-typed OOXML part as held in `convertedXml`. Element trees
@@ -47,7 +48,7 @@ export type HeaderFooterIdMap = Record<string, string | string[] | boolean | nul
 
 /** Item shape for `headerEditors` / `footerEditors` arrays. */
 export interface HeaderFooterEditorEntry {
-  editor?: { destroy?: () => void } & Record<string, unknown>;
+  editor?: { destroy?: () => void; state?: { doc?: PmNode } } & Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -67,6 +68,8 @@ export interface EditorConverterSurface {
   footerEditors: HeaderFooterEditorEntry[];
   footerIds: HeaderFooterIdMap;
   footers: Record<string, unknown>;
+  footnotes: unknown;
+  endnotes: unknown;
   footnoteProperties: unknown;
   headerEditors: HeaderFooterEditorEntry[];
   headerFooterModified: boolean;
@@ -114,6 +117,7 @@ export interface EditorConverterSurface {
    * helpers iterate both maps.
    */
   translatedNumbering: { abstracts?: Record<number, unknown>; definitions?: Record<number, unknown> };
+  wordIdAllocator?: WordIdAllocator | null;
 
   // --- Methods ---
   /**

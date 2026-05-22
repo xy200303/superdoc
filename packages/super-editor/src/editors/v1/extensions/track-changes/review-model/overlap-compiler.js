@@ -53,26 +53,32 @@ import {
  */
 
 /**
- * @typedef {{
- *   ok: true,
- *   tr: import('prosemirror-state').Transaction,
- *   createdChangeIds: string[],
- *   updatedChangeIds: string[],
- *   removedChangeIds: string[],
- *   remappedChangeIds: Array<{ from: string, to: string }>,
- *   selection?: SelectionHint,
- *   diagnostics?: GraphDiagnostic[],
- *   insertedMark?: import('prosemirror-model').Mark,
- *   deletionMarks?: import('prosemirror-model').Mark[],
- *   formatMarks?: import('prosemirror-model').Mark[],
- *   insertedFrom?: number,
- *   insertedTo?: number,
- * } | {
- *   ok: false,
- *   code: 'CAPABILITY_UNAVAILABLE'|'INVALID_TARGET'|'PRECONDITION_FAILED',
- *   message: string,
- *   details?: unknown,
- * }} TrackedEditResult
+ * @typedef {Object} TrackedEditSuccess
+ * @property {true} ok
+ * @property {import('prosemirror-state').Transaction} tr
+ * @property {string[]} createdChangeIds
+ * @property {string[]} updatedChangeIds
+ * @property {string[]} removedChangeIds
+ * @property {Array<{ from: string, to: string }>} remappedChangeIds
+ * @property {SelectionHint} [selection]
+ * @property {GraphDiagnostic[]} [diagnostics]
+ * @property {import('prosemirror-model').Mark} [insertedMark]
+ * @property {import('prosemirror-model').Mark[]} [deletionMarks]
+ * @property {import('prosemirror-model').Mark[]} [formatMarks]
+ * @property {number} [insertedFrom]
+ * @property {number} [insertedTo]
+ */
+
+/**
+ * @typedef {Object} TrackedEditFailure
+ * @property {false} ok
+ * @property {'CAPABILITY_UNAVAILABLE'|'INVALID_TARGET'|'PRECONDITION_FAILED'} code
+ * @property {string} message
+ * @property {unknown} [details]
+ */
+
+/**
+ * @typedef {TrackedEditSuccess | TrackedEditFailure} TrackedEditResult
  */
 
 const SUPPORTED_KINDS = new Set(['text-insert', 'text-delete', 'text-replace', 'format-apply', 'format-remove']);
@@ -119,7 +125,7 @@ export const compileTrackedEdit = ({ state, tr, intent, replacements = 'paired' 
       case 'format-remove':
         return compileFormat(ctx, intent);
       default:
-        return failure('CAPABILITY_UNAVAILABLE', `Unsupported tracked edit kind ${intent.kind}.`);
+        return failure('CAPABILITY_UNAVAILABLE', 'Unsupported tracked edit kind.');
     }
   } catch (error) {
     return failure('PRECONDITION_FAILED', /** @type {Error} */ (error).message ?? 'compile failed.', { error });
@@ -150,7 +156,18 @@ const makeContext = ({ state, tr, intent, replacements }) => {
   };
 };
 
-const failure = (code, message, details) => ({ ok: false, code, message, ...(details ? { details } : {}) });
+/**
+ * @param {'CAPABILITY_UNAVAILABLE'|'INVALID_TARGET'|'PRECONDITION_FAILED'} code
+ * @param {string} message
+ * @param {unknown} [details]
+ * @returns {TrackedEditFailure}
+ */
+const failure = (code, message, details) => ({
+  ok: false,
+  code,
+  message,
+  ...(details !== undefined ? { details } : {}),
+});
 
 // ---------------------------------------------------------------------------
 // Helpers — segments, ownership, marks
@@ -268,6 +285,11 @@ const stripTrackedMarksFromSlice = (slice, schema) => {
 // text-insert
 // ---------------------------------------------------------------------------
 
+/**
+ * @param {*} ctx
+ * @param {TrackedEditIntent & { kind: 'text-insert' }} intent
+ * @returns {TrackedEditResult}
+ */
 const compileTextInsert = (ctx, intent) => {
   const { at, content } = intent;
   const docSize = ctx.tr.doc.content.size;
@@ -325,6 +347,15 @@ const compileTextInsert = (ctx, intent) => {
   return applyInsert(ctx, at, sanitizedSlice, insertedMark, newId, { create: true });
 };
 
+/**
+ * @param {*} ctx
+ * @param {number} at
+ * @param {import('prosemirror-model').Slice} slice
+ * @param {import('prosemirror-model').Mark} insertMark
+ * @param {string} changeId
+ * @param {{ update?: boolean, create?: boolean }} flags
+ * @returns {TrackedEditResult}
+ */
 const applyInsert = (ctx, at, slice, insertMark, changeId, { update, create }) => {
   const beforeSize = ctx.tr.doc.content.size;
   try {
@@ -378,6 +409,7 @@ const applyInsert = (ctx, at, slice, insertMark, changeId, { update, create }) =
  *
  * @param {*} ctx
  * @param {import('./edit-intent.js').TrackedEditIntent & { kind: 'text-delete' }} intent
+ * @returns {TrackedEditResult}
  */
 const compileTextDelete = (ctx, intent) => {
   const docSize = ctx.tr.doc.content.size;
@@ -394,7 +426,7 @@ const compileTextDelete = (ctx, intent) => {
     sharedDeletionId: intent.replacementGroupHint || null,
     recordSharedDeletionId: Boolean(intent.replacementGroupHint),
   });
-  if (!result.ok) return result;
+  if (result.ok === false) return result;
 
   // Caret at original `from`: matches Word's behavior where the cursor sits
   // at the left edge of a tracked deletion.
@@ -418,6 +450,7 @@ const compileTextDelete = (ctx, intent) => {
  * @param {number} from
  * @param {number} to
  * @param {{ replacementGroupId: string, replacementSideId: string, sharedDeletionId: string | null, recordSharedDeletionId?: boolean, recordCollapsedIds?: boolean }} options
+ * @returns {{ ok: true, deletionMarks: import('prosemirror-model').Mark[], deletionId: string } | TrackedEditFailure}
  */
 const applyTrackedDelete = (
   ctx,
@@ -546,6 +579,11 @@ const applyTrackedDelete = (
 // text-replace
 // ---------------------------------------------------------------------------
 
+/**
+ * @param {*} ctx
+ * @param {TrackedEditIntent & { kind: 'text-replace' }} intent
+ * @returns {TrackedEditResult}
+ */
 const compileTextReplace = (ctx, intent) => {
   const docSize = ctx.tr.doc.content.size;
   if (intent.from < 0 || intent.to > docSize) {
@@ -573,7 +611,7 @@ const compileTextReplace = (ctx, intent) => {
       sharedDeletionId: null,
       recordCollapsedIds: false,
     });
-    if (!deleteResult.ok) return deleteResult;
+    if (deleteResult.ok === false) return deleteResult;
 
     if (!sanitizedSlice.content.size) {
       ctx.updatedChangeIds.push(ownInsertedTarget.changeId);
@@ -640,7 +678,7 @@ const compileTextReplace = (ctx, intent) => {
       replacementSideId,
       sharedDeletionId: sharedId,
     });
-    if (!delResult.ok) return delResult;
+    if (delResult.ok === false) return delResult;
     if (sharedId && delResult.deletionMarks?.length) {
       ctx.createdChangeIds.push(sharedId);
     }
@@ -708,6 +746,11 @@ const getReplacementParentId = (ctx, segments) => {
 // format-apply / format-remove (SD-486 folding)
 // ---------------------------------------------------------------------------
 
+/**
+ * @param {*} ctx
+ * @param {TrackedEditIntent & { kind: 'format-apply'|'format-remove' }} intent
+ * @returns {TrackedEditResult}
+ */
 const compileFormat = (ctx, intent) => {
   if (!TrackedFormatMarkNames.includes(intent.mark.type.name)) {
     return failure('CAPABILITY_UNAVAILABLE', `Mark ${intent.mark.type.name} is not a tracked formatting mark.`);

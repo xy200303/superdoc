@@ -15,6 +15,7 @@ import { Schema } from 'prosemirror-model';
 import { EditorState } from 'prosemirror-state';
 import { TrackInsertMarkName, TrackDeleteMarkName, TrackFormatMarkName } from '../constants.js';
 
+/** @type {Record<string, import('prosemirror-model').NodeSpec>} */
 const NODES = {
   doc: { content: 'block+' },
   paragraph: {

@@ -27,6 +27,7 @@ export const normalizeEmail = (value) => {
  * @property {string} email     normalized email, '' when unknown.
  * @property {string} name      display name (may be empty).
  * @property {boolean} hasEmail true when normalized email is non-empty.
+ * @property {string} [importedAuthor] imported author provenance, when present.
  */
 
 /**
@@ -59,7 +60,8 @@ export const getChangeAuthorIdentity = (changeOrAttrs) => {
 
   const email = normalizeEmail(attrs?.authorEmail);
   const name = typeof attrs?.author === 'string' ? attrs.author : '';
-  return { email, name, hasEmail: email.length > 0 };
+  const importedAuthor = typeof attrs?.importedAuthor === 'string' ? attrs.importedAuthor : '';
+  return { email, name, hasEmail: email.length > 0, importedAuthor };
 };
 
 /**

@@ -49,7 +49,7 @@ export const addMarkStep = ({ state, step, newTr, doc, user, date }) => {
       tr: newTr,
       intent,
     });
-    if (result.ok) {
+    if (result.ok === true) {
       if (result.formatMarks?.length) {
         newTr.setMeta(TrackChangesBasePluginKey, {
           formatMark: result.formatMarks[0],
@@ -59,7 +59,7 @@ export const addMarkStep = ({ state, step, newTr, doc, user, date }) => {
       newTr.setMeta(CommentsPluginKey, { type: 'force' });
       return;
     }
-    if (result.code !== 'CAPABILITY_UNAVAILABLE') {
+    if (result.ok === false && result.code !== 'CAPABILITY_UNAVAILABLE') {
       // Fail closed for typed errors; do not silently apply untracked.
       return;
     }
