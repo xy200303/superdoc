@@ -85,20 +85,29 @@ export interface SuperDocTransactionEvent {
   sectionType?: string | null;
 }
 
-/** Event passed to onContentError callback */
+/**
+ * Event passed to onContentError callback. `error` is `unknown` because
+ * super-editor's content-error emit forwards the original caught value
+ * (not always `Error`); `file` matches `Document.data`
+ * (`File | Blob | null | undefined`) since the document can be loaded
+ * from any of those shapes. Mirrors the core `Config.onContentError`
+ * contract.
+ */
 export interface SuperDocContentErrorEvent {
-  error: Error;
+  error: unknown;
   editor: Editor;
   documentId: string;
-  file: File;
+  file: File | Blob | null | undefined;
 }
 
-/** Event passed to onException callback */
-export interface SuperDocExceptionEvent {
-  error: Error;
-  editor?: Editor | null;
-  code?: string;
-}
+/**
+ * Event passed to onException callback. Re-exports the core union so
+ * the React wrapper matches what consumers receive when SuperDoc emits
+ * an `exception` event. The union has three runtime shapes (store init,
+ * restore failure, editor lifecycle); narrow with `'stage' in event`
+ * or `'code' in event` to access shape-specific fields.
+ */
+export type SuperDocExceptionEvent = import('superdoc').SuperDocExceptionPayload;
 
 // =============================================================================
 // React Component Types

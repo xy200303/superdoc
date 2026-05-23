@@ -1292,9 +1292,15 @@ export interface SuperDocTelemetryConfig {
  * initialization (empty entry, init failure, normalization error).
  * Always carries `stage: 'document-init'` and the offending document
  * config (`null`/`undefined` when the entry itself was empty).
+ *
+ * `error` is `unknown` because the catch path in `initializeDocuments`
+ * forwards the raw caught value (`catch (e) { emitException({ error: e,
+ * ... }) }`) and thrown values can be anything in JS. The other two
+ * emit sites construct `new Error(...)`, but consumers must narrow
+ * before reading `.message`.
  */
 export interface SuperDocExceptionStorePayload {
-  error: Error;
+  error: unknown;
   stage: 'document-init';
   document: Document | null | undefined;
 }
