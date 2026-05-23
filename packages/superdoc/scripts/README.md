@@ -121,9 +121,13 @@ what an actual consumer would see — not the workspace source.
 | `package-shape-gate.mjs` | External package-shape linters (publint + attw) against the packed tarball. | Catches condition ordering, masquerading exports, missing field declarations. |
 | `check-root-classification-closure.mjs` | Asserts no `supported-root` or `legacy-root` export references an `internal-candidate` symbol in its public declared type. | Closure rule from SD-3212. |
 
-`check:public:superdoc` runs all six of these in order: `typecheck-matrix`
-packs and installs the SuperDoc tarball into the fixture, then the
-remaining five gates reuse that install. CI (`ci-superdoc.yml`) and
+`check:public:superdoc` runs all six in order. `typecheck-matrix` packs
+`superdoc.tgz` and installs it into the consumer fixture. The rest
+reuse what matrix produced: `deep-type-audit`, `snapshot --all
+--check`, and `check-root-classification-closure` read from the
+installed fixture in `node_modules/superdoc/`; `package-shape-gate`
+runs `publint` / `attw` against the packed tarball at
+`packages/superdoc/superdoc.tgz` directly. CI (`ci-superdoc.yml`) and
 release workflows (`release-superdoc.yml`, `release-stable.yml`) call
 `pnpm check:public:superdoc --skip-build` directly — no duplicated step
 lists.

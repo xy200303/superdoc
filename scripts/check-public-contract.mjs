@@ -25,10 +25,12 @@
  *                            no supported-root/legacy-root export
  *                            references an internal-candidate type.
  *
- * Matrix runs BEFORE the post-install gates on purpose: matrix packs +
- * installs the tarball once, and stages 3-6 reuse that install.
- * Without this order each downstream stage would `--pack` separately
- * and multiply the work.
+ * Matrix runs BEFORE stages 3-6 on purpose: it packs `superdoc.tgz`
+ * and installs the tarball into the consumer fixture once. Stages 3,
+ * 5, and 6 (deep-type-audit, snapshots, closure) reuse the installed
+ * fixture; stage 4 (package-shape-gate) reuses the packed tarball
+ * directly. Without this ordering each downstream stage would
+ * `--pack` separately and multiply the work.
  *
  * Local usage:
  *   pnpm check:public           (umbrella, runs SuperDoc + Document API)
@@ -89,7 +91,7 @@ const stages = [
     args: ['package-shape-gate.mjs'],
     blurb:
       'External npm-package linters (publint + attw) against the packed manifest. ' +
-      'Reuses the install produced by typecheck-matrix.',
+      'Reuses the tarball produced by typecheck-matrix (not the installed fixture).',
   },
   {
     name: 'snapshot --all --check',
