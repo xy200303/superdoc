@@ -2476,4 +2476,68 @@ describe('SuperDoc core', () => {
       expect(resolver).toHaveBeenCalledWith(expect.objectContaining({ comment: unwrapped }));
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // SD-2916 PR-A: safe field defaults for delayed-init fields
+  // ---------------------------------------------------------------------------
+  //
+  // These tests pin the "before ready" contract for the four fields PR-A
+  // initializes at the field declaration (or in the constructor body for
+  // `#surfaceManager`). The async `#init` overwrites some of these later,
+  // but consumers reading them immediately after `new SuperDoc(...)` and
+  // before the `ready` event must see a usable value, not `undefined`.
+
+  describe('SD-2916 PR-A: safe field defaults', () => {
+    it('initializes `whiteboard` to null immediately after construction', () => {
+      createAppHarness();
+      const instance = new SuperDoc({
+        selector: '#host',
+        documents: [],
+        modules: { comments: {}, toolbar: {} },
+        user: { name: 'Jane', email: 'jane@example.com' },
+      });
+
+      // Whiteboard is constructed in `#initWhiteboard()` after the
+      // collaboration await; before that it must be a stable null.
+      expect(instance.whiteboard).toBeNull();
+    });
+
+    it('exposes `openSurface` immediately after construction (SurfaceManager constructed in ctor body)', () => {
+      createAppHarness();
+      const instance = new SuperDoc({
+        selector: '#host',
+        documents: [],
+        modules: { comments: {}, toolbar: {} },
+        user: { name: 'Jane', email: 'jane@example.com' },
+      });
+
+      // The handle returned must be a real object with `id`, `result`,
+      // `close`, etc. — not throw `Cannot read properties of undefined`.
+      const handle = instance.openSurface({ mode: 'dialog', render: () => null });
+      expect(handle).toBeDefined();
+      expect(typeof handle.id).toBe('string');
+      expect(typeof handle.close).toBe('function');
+      expect(handle.result).toBeInstanceOf(Promise);
+      // Resolve the handle to keep the surface registry clean for other tests.
+      handle.close({ status: 'cancelled' });
+    });
+
+    it('`version` is the injected build-time constant, not the placeholder', () => {
+      createAppHarness();
+      const instance = new SuperDoc({
+        selector: '#host',
+        documents: [],
+        modules: { comments: {}, toolbar: {} },
+        user: { name: 'Jane', email: 'jane@example.com' },
+      });
+
+      // The field declaration seeds `'0.0.0'` so the field is
+      // structurally assigned, then `#init` synchronously overwrites
+      // with `__APP_VERSION__` (vite injects this in both dev/test and
+      // build config). Assert the overwrite happened — a regression
+      // that drops the overwrite would leave the placeholder visible.
+      expect(typeof instance.version).toBe('string');
+      expect(instance.version).not.toBe('0.0.0');
+    });
+  });
 });
