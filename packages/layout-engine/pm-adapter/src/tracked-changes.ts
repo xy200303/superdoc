@@ -71,6 +71,9 @@ export const stripTrackedChangeFromRun = (run: Run): void => {
   if ('trackedChange' in run && run.trackedChange) {
     delete run.trackedChange;
   }
+  if ('trackedChanges' in run && run.trackedChanges) {
+    delete run.trackedChanges;
+  }
 };
 
 /**
@@ -222,6 +225,10 @@ export const buildTrackedChangeMetaFromMark = (mark: PMMark, storyKey?: string):
     kind,
     id: deriveTrackedChangeId(kind, attrs),
   };
+  if (typeof attrs.overlapParentId === 'string' && attrs.overlapParentId) {
+    meta.overlapParentId = attrs.overlapParentId;
+    meta.relationship = 'child';
+  }
   if (typeof attrs.author === 'string' && attrs.author) {
     meta.author = attrs.author;
   }
@@ -265,6 +272,13 @@ export const selectTrackedChangeMeta = (
   return existing;
 };
 
+const normalizeTrackedChangeLayers = (run: TextRun): TrackedChangeMeta[] => {
+  if (Array.isArray(run.trackedChanges) && run.trackedChanges.length > 0) {
+    return run.trackedChanges;
+  }
+  return run.trackedChange ? [run.trackedChange] : [];
+};
+
 /**
  * Checks if two text runs have compatible tracked change metadata for merging.
  * Runs are compatible if they have the same kind and ID, or both have no metadata.
@@ -274,11 +288,13 @@ export const selectTrackedChangeMeta = (
  * @returns true if runs can be merged, false otherwise
  */
 export const trackedChangesCompatible = (a: TextRun, b: TextRun): boolean => {
-  const aMeta = a.trackedChange;
-  const bMeta = b.trackedChange;
-  if (!aMeta && !bMeta) return true;
-  if (!aMeta || !bMeta) return false;
-  return aMeta.kind === bMeta.kind && aMeta.id === bMeta.id;
+  const aLayers = normalizeTrackedChangeLayers(a);
+  const bLayers = normalizeTrackedChangeLayers(b);
+  if (aLayers.length !== bLayers.length) return false;
+  return aLayers.every((aMeta, index) => {
+    const bMeta = bLayers[index];
+    return Boolean(bMeta && aMeta.kind === bMeta.kind && aMeta.id === bMeta.id);
+  });
 };
 
 /**
@@ -517,6 +533,7 @@ export const applyTrackedChangesModeToRuns = (
           (run.trackedChange.kind === 'insert' || run.trackedChange.kind === 'delete')
         ) {
           delete run.trackedChange;
+          delete run.trackedChanges;
         }
       });
     }

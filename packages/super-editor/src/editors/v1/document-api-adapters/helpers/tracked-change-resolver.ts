@@ -2,6 +2,8 @@ import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import type { Editor } from '../../core/Editor.js';
 import type {
   StoryLocator,
+  TrackChangeOverlapInfo,
+  TrackChangeOverlapLayer,
   TrackChangeType,
   TrackChangeWordRevisionIds,
   TrackedChangeAddress,
@@ -41,10 +43,15 @@ export type GroupedTrackedChange = {
   attrs: Record<string, unknown>;
   excerpt?: string;
   wordRevisionIds?: TrackChangeWordRevisionIds;
+  overlap?: TrackChangeOverlapInfo;
 };
 
 type ChangeTypeInput = Pick<GroupedTrackedChange, 'hasInsert' | 'hasDelete' | 'hasFormat'>;
 type GroupedTrackedChangeDraft = Omit<GroupedTrackedChange, 'id' | 'excerpt'> & { excerptParts: string[] };
+type InternalTrackChangeOverlapLayer = TrackChangeOverlapLayer & {
+  rawId?: string;
+  commandRawId?: string;
+};
 
 function getRawTrackedMarks(editor: Editor): RawTrackedMark[] {
   try {
@@ -154,6 +161,84 @@ function isTrackedMarkName(markType: string | undefined): boolean {
   return markType === TrackInsertMarkName || markType === TrackDeleteMarkName || markType === TrackFormatMarkName;
 }
 
+function getTrackedChangeAliasCandidates(change: GroupedTrackedChange): string[] {
+  const candidates = [
+    change.rawId,
+    change.commandRawId,
+    change.id,
+    toNonEmptyString(change.attrs.id),
+    toNonEmptyString(change.attrs.sourceId),
+  ];
+  return Array.from(new Set(candidates.filter((value): value is string => Boolean(value))));
+}
+
+function layerFromChange(
+  change: GroupedTrackedChange,
+  relationship: TrackChangeOverlapLayer['relationship'],
+): InternalTrackChangeOverlapLayer {
+  return {
+    id: change.id,
+    rawId: change.rawId,
+    commandRawId: change.commandRawId,
+    type: resolveTrackedChangeType(change),
+    relationship,
+  };
+}
+
+function compareOverlapChildren(a: GroupedTrackedChange, b: GroupedTrackedChange): number {
+  const aType = resolveTrackedChangeType(a);
+  const bType = resolveTrackedChangeType(b);
+  if (aType !== bType) {
+    if (aType === 'delete') return -1;
+    if (bType === 'delete') return 1;
+  }
+  if (a.from !== b.from) return a.from - b.from;
+  return a.id.localeCompare(b.id);
+}
+
+function attachOverlapMetadata(grouped: GroupedTrackedChange[]): void {
+  if (grouped.length < 2) return;
+
+  const byAlias = new Map<string, GroupedTrackedChange>();
+  for (const change of grouped) {
+    for (const alias of getTrackedChangeAliasCandidates(change)) {
+      if (!byAlias.has(alias)) byAlias.set(alias, change);
+    }
+  }
+
+  const childrenByParent = new Map<GroupedTrackedChange, GroupedTrackedChange[]>();
+  for (const child of grouped) {
+    const parentRef = toNonEmptyString(child.attrs.overlapParentId);
+    if (!parentRef) continue;
+    const parent = byAlias.get(parentRef);
+    if (!parent || parent === child) continue;
+    const children = childrenByParent.get(parent) ?? [];
+    children.push(child);
+    childrenByParent.set(parent, children);
+  }
+
+  for (const [parent, children] of childrenByParent.entries()) {
+    const orderedChildren = children.slice().sort(compareOverlapChildren);
+    const visualLayers = [
+      layerFromChange(parent, 'parent'),
+      ...orderedChildren.map((child) => layerFromChange(child, 'child')),
+    ];
+    const preferredContextTarget =
+      visualLayers.find((layer) => layer.relationship === 'child' && layer.type === 'delete') ??
+      visualLayers.find((layer) => layer.relationship === 'child');
+
+    parent.overlap = {
+      visualLayers,
+      ...(preferredContextTarget
+        ? {
+            preferredContextTargetId: preferredContextTarget.id,
+            preferredContextTarget,
+          }
+        : {}),
+    };
+  }
+}
+
 export function getTrackedChangeMarkAlias(mark: {
   readonly type: { readonly name: string };
   readonly attrs?: Readonly<Record<string, unknown>>;
@@ -261,6 +346,7 @@ export function groupTrackedChanges(editor: Editor): GroupedTrackedChange[] {
       if (a.from !== b.from) return a.from - b.from;
       return a.id.localeCompare(b.id);
     });
+  attachOverlapMetadata(grouped);
 
   groupedCache.set(editor, { doc: currentDoc, grouped });
   return grouped;

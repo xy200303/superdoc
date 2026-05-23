@@ -1,12 +1,9 @@
 import { Extension } from '@core/Extension.js';
-import { Slice } from 'prosemirror-model';
-import { Mapping, ReplaceStep, AddMarkStep, RemoveMarkStep } from 'prosemirror-transform';
 import { TrackDeleteMarkName, TrackInsertMarkName, TrackFormatMarkName } from './constants.js';
 import { TrackChangesBasePlugin, TrackChangesBasePluginKey } from './plugins/index.js';
 import { getTrackChanges } from './trackChangesHelpers/getTrackChanges.js';
-import { collectTrackedChanges, isTrackedChangeActionAllowed } from './permission-helpers.js';
-import { CommentsPluginKey, createOrUpdateTrackedChangeComment } from '../comment/comments-plugin.js';
-import { findMarkInRangeBySnapshot } from './trackChangesHelpers/markSnapshotHelpers.js';
+import { collectTrackedChanges } from './permission-helpers.js';
+import { CommentsPluginKey } from '../comment/comments-plugin.js';
 import { hasExpandedSelection } from '@utils/selectionUtils.js';
 import { compileTrackedEdit } from './review-model/overlap-compiler.js';
 import {
@@ -54,13 +51,128 @@ const dispatchReviewDecision = ({ editor, state, dispatch, decision, target }) =
     return { applied: false, failure: result };
   }
   if (dispatch) {
+    // Compute the post-dispatch state locally so we can derive update events
+    // for partial decisions (where a change has remaining tracked text on the
+    // doc). Then dispatch the real transaction.
+    const nextState = state.apply(result.tr);
     dispatch(result.tr);
-    const events = buildDecisionBubbleEvents({ result, editor });
-    if (editor?.emit && events.length) {
-      for (const event of events) editor.emit('commentsUpdate', event);
+
+    if (editor?.emit) {
+      // Partial decisions retire the original id and mint successor fragments
+      // (splitFromId === originalId). For each retired id, decide whether to
+      // emit `resolve` (no successors remain) or `update` (successors keep
+      // the logical change alive with refreshed text).
+      const resolveEvents = buildDecisionBubbleEvents({ result, editor });
+      for (const event of resolveEvents) {
+        const successorsPresent = collectRemainingForLogicalId({
+          state: nextState,
+          originalId: event.changeId,
+        }).some(({ mark }) => mark.attrs?.splitFromId === event.changeId);
+        if (successorsPresent) continue;
+        editor.emit('commentsUpdate', event);
+      }
+
+      const touched =
+        result.touchedChangeIds instanceof Set ? result.touchedChangeIds : new Set(result.touchedChangeIds || []);
+      const emittedFor = new Set();
+      for (const changeId of touched) {
+        if (emittedFor.has(changeId)) continue;
+        // Skip ids that are successor fragments of another touched id (we
+        // emit one update for the logical original id).
+        if (
+          Array.from(touched).some(
+            (other) => other !== changeId && isSuccessorOf({ state: nextState, id: changeId, originalId: other }),
+          )
+        ) {
+          continue;
+        }
+        const remaining = collectRemainingForLogicalId({ state: nextState, originalId: changeId });
+        if (!remaining.length) continue;
+        const payload = buildPartialUpdatePayload({
+          state: nextState,
+          documentId: editor.options?.documentId,
+          originalId: changeId,
+          remaining,
+        });
+        if (payload) {
+          editor.emit('commentsUpdate', payload);
+          emittedFor.add(changeId);
+        }
+      }
     }
   }
   return { applied: true, result };
+};
+
+/**
+ * Collect tracked-change marks that represent the logical original id, either
+ * directly (mark.attrs.id === originalId) or via successor fragments
+ * (mark.attrs.splitFromId === originalId).
+ *
+ * @param {{ state: import('prosemirror-state').EditorState, originalId: string }} options
+ * @returns {Array<{ from: number, to: number, mark: import('prosemirror-model').Mark, node: import('prosemirror-model').Node }>}
+ */
+const collectRemainingForLogicalId = ({ state, originalId }) => {
+  const all = getTrackChanges(state);
+  return all.filter(({ mark }) => mark.attrs?.id === originalId || mark.attrs?.splitFromId === originalId);
+};
+
+const isSuccessorOf = ({ state, id, originalId }) => {
+  const all = getTrackChanges(state);
+  return all.some(({ mark }) => mark.attrs?.id === id && mark.attrs?.splitFromId === originalId);
+};
+
+/**
+ * Build a comments-plugin-shaped `update` payload from the remaining
+ * tracked-change marks for a logical original id. Aggregates inserted /
+ * deleted text across all surviving successor fragments and uses the original
+ * id as the changeId so existing bubble threads remain addressable.
+ */
+const buildPartialUpdatePayload = ({ state, documentId, originalId, remaining }) => {
+  let insertedMark = null;
+  let deletionMark = null;
+  let formatMark = null;
+  for (const entry of remaining) {
+    if (!insertedMark && entry.mark.type.name === TrackInsertMarkName) insertedMark = entry.mark;
+    if (!deletionMark && entry.mark.type.name === TrackDeleteMarkName) deletionMark = entry.mark;
+    if (!formatMark && entry.mark.type.name === TrackFormatMarkName) formatMark = entry.mark;
+  }
+  const anchorMark = insertedMark || deletionMark || formatMark;
+  if (!anchorMark) return null;
+
+  const insertedText = remaining
+    .filter(({ mark }) => mark.type.name === TrackInsertMarkName)
+    .map(({ node }) => node?.text || node?.textContent || '')
+    .join('');
+  const deletedText = remaining
+    .filter(({ mark }) => mark.type.name === TrackDeleteMarkName)
+    .map(({ node }) => node?.text || node?.textContent || '')
+    .join('');
+
+  const trackedChangeType = insertedMark
+    ? TrackInsertMarkName
+    : deletionMark
+      ? TrackDeleteMarkName
+      : TrackFormatMarkName;
+  const isReplacement = Boolean(insertedMark && deletionMark);
+  const { author, authorId, authorEmail, authorImage, date, importedAuthor } = anchorMark.attrs;
+
+  return {
+    event: 'update',
+    type: 'trackedChange',
+    documentId,
+    changeId: originalId,
+    trackedChangeType: isReplacement ? 'both' : trackedChangeType,
+    trackedChangeText: trackedChangeType === TrackDeleteMarkName ? deletedText : insertedText,
+    trackedChangeDisplayType: null,
+    deletedText: isReplacement || deletionMark ? deletedText : null,
+    author,
+    ...(authorId && { authorId }),
+    authorEmail,
+    ...(authorImage && { authorImage }),
+    date,
+    ...(importedAuthor && { importedAuthor: { name: importedAuthor } }),
+  };
 };
 
 export const TrackChanges = Extension.create({
@@ -85,49 +197,7 @@ export const TrackChanges = Extension.create({
             decision: 'accept',
             target: { kind: 'range', from, to },
           });
-          if (reviewDecision) return reviewDecision.applied;
-
-          const trackedChanges = collectTrackedChanges({ state, from, to });
-          if (!isTrackedChangeActionAllowed({ editor, action: 'accept', trackedChanges })) return false;
-
-          let { tr, doc } = state;
-
-          // if (from === to) {
-          //   to += 1;
-          // }
-
-          // tr.setMeta('acceptReject', true);
-          tr.setMeta('inputType', 'acceptReject');
-          const touchedChangeIds = new Set();
-          const map = new Mapping();
-
-          doc.nodesBetween(from, to, (node, pos) => {
-            const trackedMark = getTrackedMark(node);
-            if (!trackedMark) return;
-
-            const mappedFrom = map.map(Math.max(pos, from));
-            const mappedTo = map.map(Math.min(pos + node.nodeSize, to));
-            if (mappedFrom >= mappedTo) return;
-
-            if (trackedMark.attrs?.id) touchedChangeIds.add(trackedMark.attrs.id);
-
-            if (trackedMark.type.name === TrackDeleteMarkName) {
-              const deletionStep = new ReplaceStep(mappedFrom, mappedTo, Slice.empty);
-              tr.step(deletionStep);
-              map.appendMap(deletionStep.getMap());
-              return;
-            }
-
-            tr.step(new RemoveMarkStep(mappedFrom, mappedTo, trackedMark));
-          });
-
-          return dispatchTrackedChangeResolution({
-            state,
-            tr,
-            dispatch,
-            editor,
-            touchedChangeIds,
-          });
+          return reviewDecision.applied;
         },
 
       rejectTrackedChangesBetween:
@@ -140,70 +210,7 @@ export const TrackChanges = Extension.create({
             decision: 'reject',
             target: { kind: 'range', from, to },
           });
-          if (reviewDecision) return reviewDecision.applied;
-
-          const trackedChanges = collectTrackedChanges({ state, from, to });
-          if (!isTrackedChangeActionAllowed({ editor, action: 'reject', trackedChanges })) return false;
-
-          const { tr, doc } = state;
-          const touchedChangeIds = new Set();
-          tr.setMeta('inputType', 'acceptReject');
-
-          const map = new Mapping();
-
-          doc.nodesBetween(from, to, (node, pos) => {
-            const trackedMark = getTrackedMark(node);
-            if (!trackedMark) return;
-
-            const mappedFrom = map.map(Math.max(pos, from));
-            const mappedTo = map.map(Math.min(pos + node.nodeSize, to));
-            if (mappedFrom >= mappedTo) return;
-
-            if (trackedMark.attrs?.id) touchedChangeIds.add(trackedMark.attrs.id);
-
-            if (trackedMark.type.name === TrackDeleteMarkName) {
-              tr.step(new RemoveMarkStep(mappedFrom, mappedTo, trackedMark));
-              return;
-            }
-
-            if (trackedMark.type.name === TrackInsertMarkName) {
-              const deletionStep = new ReplaceStep(mappedFrom, mappedTo, Slice.empty);
-              tr.step(deletionStep);
-              map.appendMap(deletionStep.getMap());
-              return;
-            }
-
-            trackedMark.attrs.after.forEach((newMark) => {
-              const liveMark = findMarkInRangeBySnapshot({
-                doc: tr.doc,
-                from: mappedFrom,
-                to: mappedTo,
-                snapshot: newMark,
-              });
-
-              if (!liveMark) {
-                return;
-              }
-
-              tr.step(new RemoveMarkStep(mappedFrom, mappedTo, liveMark));
-            });
-
-            // Remove suggested "after" marks first, then restore "before" marks.
-            // This avoids overlap matching removing a just-restored attribute-only mark (e.g. textStyle).
-            trackedMark.attrs.before.forEach((oldMark) => {
-              tr.step(new AddMarkStep(mappedFrom, mappedTo, state.schema.marks[oldMark.type].create(oldMark.attrs)));
-            });
-
-            tr.step(new RemoveMarkStep(mappedFrom, mappedTo, trackedMark));
-          });
-
-          return dispatchTrackedChangeResolution({
-            state,
-            tr,
-            dispatch,
-            editor,
-            touchedChangeIds,
-          });
+          return reviewDecision.applied;
         },
 
       acceptTrackedChange:
@@ -256,7 +263,7 @@ export const TrackChanges = Extension.create({
 
       acceptTrackedChangeById:
         (id) =>
-        ({ state, tr, dispatch, editor, commands }) => {
+        ({ state, dispatch, editor }) => {
           const reviewDecision = dispatchReviewDecision({
             editor,
             state,
@@ -264,22 +271,12 @@ export const TrackChanges = Extension.create({
             decision: 'accept',
             target: { kind: 'id', id },
           });
-          if (reviewDecision) return reviewDecision.applied;
-
-          const toResolve = getChangesByIdToResolve(state, id) || [];
-
-          return toResolve
-            .map(({ from, to }) => {
-              let mappedFrom = tr.mapping.map(from);
-              let mappedTo = tr.mapping.map(to);
-              return commands.acceptTrackedChangesBetween(mappedFrom, mappedTo);
-            })
-            .every((result) => result);
+          return reviewDecision.applied;
         },
 
       acceptAllTrackedChanges:
         () =>
-        ({ state, dispatch, editor, commands }) => {
+        ({ state, dispatch, editor }) => {
           const reviewDecision = dispatchReviewDecision({
             editor,
             state,
@@ -287,16 +284,12 @@ export const TrackChanges = Extension.create({
             decision: 'accept',
             target: { kind: 'all' },
           });
-          if (reviewDecision) return reviewDecision.applied;
-
-          const from = 0,
-            to = state.doc.content.size;
-          return commands.acceptTrackedChangesBetween(from, to);
+          return reviewDecision.applied;
         },
 
       rejectTrackedChangeById:
         (id) =>
-        ({ state, tr, dispatch, editor, commands }) => {
+        ({ state, dispatch, editor }) => {
           const reviewDecision = dispatchReviewDecision({
             editor,
             state,
@@ -304,17 +297,7 @@ export const TrackChanges = Extension.create({
             decision: 'reject',
             target: { kind: 'id', id },
           });
-          if (reviewDecision) return reviewDecision.applied;
-
-          const toReject = getChangesByIdToResolve(state, id) || [];
-
-          return toReject
-            .map(({ from, to }) => {
-              let mappedFrom = tr.mapping.map(from);
-              let mappedTo = tr.mapping.map(to);
-              return commands.rejectTrackedChangesBetween(mappedFrom, mappedTo);
-            })
-            .every((result) => result);
+          return reviewDecision.applied;
         },
 
       rejectTrackedChange:
@@ -367,7 +350,7 @@ export const TrackChanges = Extension.create({
 
       rejectAllTrackedChanges:
         () =>
-        ({ state, dispatch, editor, commands }) => {
+        ({ state, dispatch, editor }) => {
           const reviewDecision = dispatchReviewDecision({
             editor,
             state,
@@ -375,11 +358,7 @@ export const TrackChanges = Extension.create({
             decision: 'reject',
             target: { kind: 'all' },
           });
-          if (reviewDecision) return reviewDecision.applied;
-
-          const from = 0,
-            to = state.doc.content.size;
-          return commands.rejectTrackedChangesBetween(from, to);
+          return reviewDecision.applied;
         },
 
       insertTrackedChange:
@@ -530,10 +509,6 @@ export const TrackChanges = Extension.create({
   },
 });
 
-const TRACKED_CHANGE_MARKS = [TrackDeleteMarkName, TrackInsertMarkName, TrackFormatMarkName];
-
-const getTrackedMark = (node) => node?.marks?.find((mark) => TRACKED_CHANGE_MARKS.includes(mark.type.name)) ?? null;
-
 const getTrackedChangeActionSelection = ({ state, editor }) => {
   const currentSelection = state?.selection;
   if (hasExpandedSelection(currentSelection)) {
@@ -622,76 +597,6 @@ const resolveTrackedChangeAction = ({
   return hasExpandedSelection(targetSelection)
     ? betweenCommand(targetSelection.from, targetSelection.to)
     : selectionCommand();
-};
-
-const collectRemainingMarksByType = (trackedChanges = []) => ({
-  insertedMark: trackedChanges.find(({ mark }) => mark.type.name === TrackInsertMarkName)?.mark ?? null,
-  deletionMark: trackedChanges.find(({ mark }) => mark.type.name === TrackDeleteMarkName)?.mark ?? null,
-  formatMark: trackedChanges.find(({ mark }) => mark.type.name === TrackFormatMarkName)?.mark ?? null,
-});
-
-const emitTrackedChangeCommentLifecycle = ({ editor, nextState, touchedChangeIds }) => {
-  if (!editor?.emit || !touchedChangeIds?.size) {
-    return;
-  }
-
-  const resolvedByEmail = editor.options?.user?.email;
-  const resolvedByName = editor.options?.user?.name;
-
-  touchedChangeIds.forEach((changeId) => {
-    const remainingTrackedChanges = getTrackChanges(nextState, changeId);
-
-    // Partial resolution keeps the tracked-change thread alive with updated text;
-    // full resolution emits the normal resolve event so the bubble can disappear.
-    if (!remainingTrackedChanges.length) {
-      editor.emit('commentsUpdate', {
-        type: 'trackedChange',
-        event: 'resolve',
-        changeId,
-        resolvedByEmail,
-        resolvedByName,
-      });
-      return;
-    }
-
-    const marks = collectRemainingMarksByType(remainingTrackedChanges);
-    const updatePayload = createOrUpdateTrackedChangeComment({
-      event: 'update',
-      marks,
-      deletionNodes: [],
-      nodes: [],
-      newEditorState: nextState,
-      documentId: editor.options?.documentId,
-      trackedChangesForId: remainingTrackedChanges,
-    });
-
-    if (updatePayload) {
-      editor.emit('commentsUpdate', updatePayload);
-    }
-  });
-};
-
-const dispatchTrackedChangeResolution = ({ state, tr, dispatch, editor, touchedChangeIds }) => {
-  if (!tr.steps.length) {
-    return true;
-  }
-
-  // Apply tr locally to get nextState for comment lifecycle; dispatch(tr) updates the editor afterward.
-  const nextState = state.apply(tr);
-
-  if (dispatch) {
-    dispatch(tr);
-  }
-
-  if (dispatch && touchedChangeIds?.size) {
-    emitTrackedChangeCommentLifecycle({
-      editor,
-      nextState,
-      touchedChangeIds,
-    });
-  }
-
-  return true;
 };
 
 const getChangesByIdToResolve = (state, id) => {
@@ -843,11 +748,20 @@ const dispatchCompiledInsertTrackedChange = ({
     return true;
   }
 
+  // Build real metadata for the comments plugin from the compiler result so
+  // the bubble pipeline can derive the inserted/deleted text immediately
+  // without re-scanning the doc.
+  const insertedNodes = result.insertedNodes ?? [];
+  const deletionNodes = result.deletionNodes ?? [];
   const meta = {
     insertedMark: result.insertedMark || null,
-    deletionMark: result.deletionMarks?.[0] || null,
-    deletionNodes: [],
-    step: result.insertedMark ? { slice: { content: { content: [] } } } : null,
+    deletionMark: result.deletionMark || result.deletionMarks?.[0] || null,
+    deletionNodes,
+    step: result.insertedStep
+      ? result.insertedStep
+      : result.insertedMark
+        ? { slice: { content: { content: insertedNodes } } }
+        : null,
     emitCommentEvent,
   };
   tr.setMeta(TrackChangesBasePluginKey, meta);
@@ -868,6 +782,7 @@ const dispatchCompiledInsertTrackedChange = ({
       parentId: changeId,
       content: comment,
       author: resolvedUser.name,
+      authorId: resolvedUser.id,
       authorEmail: resolvedUser.email,
       authorImage: resolvedUser.image,
     });

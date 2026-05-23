@@ -2,6 +2,7 @@
 import { formatDate } from './helpers';
 import { superdocIcons } from '@superdoc/icons.js';
 import { computed, getCurrentInstance } from 'vue';
+import { actorIdentitiesMatch } from '@superdoc/common';
 import { isAllowed, PERMISSIONS } from '@superdoc/core/collaboration/permissions.js';
 import { useCommentsStore } from '@superdoc/stores/comments-store';
 import Avatar from '@superdoc/components/general/Avatar.vue';
@@ -37,7 +38,12 @@ const props = defineProps({
 const { proxy } = getCurrentInstance();
 const role = proxy.$superdoc.config.role;
 const isInternal = proxy.$superdoc.config.isInternal;
-const isOwnComment = props.comment.creatorEmail === proxy.$superdoc.config.user.email;
+const isCommentOwnedByCurrentUser = (comment) =>
+  actorIdentitiesMatch({
+    current: proxy.$superdoc.config.user,
+    other: { id: comment?.creatorId, email: comment?.creatorEmail },
+  });
+const isOwnComment = computed(() => isCommentOwnedByCurrentUser(props.comment));
 
 const { uiFontFamily } = useUiFontFamily();
 
@@ -70,7 +76,7 @@ const allowResolve = computed(() => {
     superdoc: proxy.$superdoc,
   };
 
-  if (isOwnComment || props.comment.trackedChange) {
+  if (isOwnComment.value || props.comment.trackedChange) {
     return isAllowed(PERMISSIONS.RESOLVE_OWN, role, isInternal, context);
   } else {
     return isAllowed(PERMISSIONS.RESOLVE_OTHER, role, isInternal, context);
@@ -87,7 +93,7 @@ const allowReject = computed(() => {
     superdoc: proxy.$superdoc,
   };
 
-  if (isOwnComment || props.comment.trackedChange) {
+  if (isOwnComment.value || props.comment.trackedChange) {
     return isAllowed(PERMISSIONS.REJECT_OWN, role, isInternal, context);
   } else {
     return isAllowed(PERMISSIONS.REJECT_OTHER, role, isInternal, context);
@@ -110,11 +116,11 @@ const getOverflowOptions = computed(() => {
   const options = new Set();
 
   // Only the comment creator can edit, and only when comments aren't read-only
-  if (!props.config.readOnly && props.comment.creatorEmail === proxy.$superdoc.config.user.email) {
+  if (!props.config.readOnly && isCommentOwnedByCurrentUser(props.comment)) {
     options.add('edit');
   }
 
-  const isOwnComment = props.comment.creatorEmail === proxy.$superdoc.config.user.email;
+  const isOwnComment = isCommentOwnedByCurrentUser(props.comment);
 
   const context = {
     comment: props.comment,
@@ -144,8 +150,7 @@ const handleSelect = (value) => emit('overflow-select', value);
 const isImported = computed(() => {
   const hasImportOrigin = props.comment.origin != null || !!props.comment.importedAuthor?.name;
   if (!hasImportOrigin) return false;
-  const currentUserEmail = proxy.$superdoc.config.user?.email;
-  if (currentUserEmail && props.comment.creatorEmail === currentUserEmail) return false;
+  if (isCommentOwnedByCurrentUser(props.comment)) return false;
   return true;
 });
 

@@ -67,6 +67,39 @@ function stableTrackChangeSignature(change: TrackChangeLike): string {
   return `${type}|${author}|${authorEmail}|${date}|${excerpt}`;
 }
 
+function normalizeStableTrackChangeId(value: unknown, rawToStableId: ReadonlyMap<string, string>): unknown {
+  if (typeof value !== 'string' || value.length === 0) return value;
+  return rawToStableId.get(value) ?? value;
+}
+
+function normalizeOverlapLayer(value: unknown, rawToStableId: ReadonlyMap<string, string>): unknown {
+  const record = asRecord(value);
+  if (!record) return value;
+  return {
+    ...record,
+    id: normalizeStableTrackChangeId(record.id, rawToStableId),
+  };
+}
+
+function normalizeTrackChangeOverlap(value: unknown, rawToStableId: ReadonlyMap<string, string>): unknown {
+  const record = asRecord(value);
+  if (!record) return value;
+
+  const visualLayers = Array.isArray(record.visualLayers)
+    ? record.visualLayers.map((layer) => normalizeOverlapLayer(layer, rawToStableId))
+    : record.visualLayers;
+  const preferredContextTarget = record.preferredContextTarget
+    ? normalizeOverlapLayer(record.preferredContextTarget, rawToStableId)
+    : record.preferredContextTarget;
+
+  return {
+    ...record,
+    ...(Array.isArray(record.visualLayers) ? { visualLayers } : {}),
+    preferredContextTargetId: normalizeStableTrackChangeId(record.preferredContextTargetId, rawToStableId),
+    ...(record.preferredContextTarget ? { preferredContextTarget } : {}),
+  };
+}
+
 /**
  * Builds stable-ID ↔ raw-ID mappings from a track-changes list result.
  * The CLI uses SHA-1-based stable IDs instead of adapter raw IDs.
@@ -85,14 +118,14 @@ function buildStableIdMappings(rawListResult: unknown): {
   const rawToStableId = new Map<string, string>();
   const signatureCounts = new Map<string, number>();
 
-  const normalizedItems = asArray(record.items)
+  const entries = asArray(record.items)
     .map((entry) => asRecord(entry))
     .filter((entry): entry is Record<string, unknown> => Boolean(entry))
     .map((entry) => {
       const rawId =
         (typeof entry.id === 'string' && entry.id.length > 0 ? entry.id : undefined) ??
         asTrackChangeAddress(entry.address)?.entityId;
-      if (!rawId) return entry;
+      if (!rawId) return { entry };
 
       const signature = stableTrackChangeSignature(entry);
       const hash = createHash('sha1').update(signature).digest('hex').slice(0, 24);
@@ -103,15 +136,22 @@ function buildStableIdMappings(rawListResult: unknown): {
       stableToRawId.set(stableId, rawId);
       rawToStableId.set(rawId, stableId);
 
-      const normalizedAddress = asTrackChangeAddress(entry.address);
-      const handleRecord = asRecord(entry.handle);
-      return {
-        ...entry,
-        id: stableId,
-        address: normalizedAddress ? { ...normalizedAddress, entityId: stableId } : entry.address,
-        handle: handleRecord ? { ...handleRecord, ref: `tc:${stableId}` } : entry.handle,
-      };
+      return { entry, rawId, stableId };
     });
+
+  const normalizedItems = entries.map(({ entry, rawId, stableId }) => {
+    if (!rawId || !stableId) return entry;
+
+    const normalizedAddress = asTrackChangeAddress(entry.address);
+    const handleRecord = asRecord(entry.handle);
+    return {
+      ...entry,
+      id: stableId,
+      address: normalizedAddress ? { ...normalizedAddress, entityId: stableId } : entry.address,
+      handle: handleRecord ? { ...handleRecord, ref: `tc:${stableId}` } : entry.handle,
+      ...(entry.overlap !== undefined ? { overlap: normalizeTrackChangeOverlap(entry.overlap, rawToStableId) } : {}),
+    };
+  });
 
   return {
     normalizedResult: {
@@ -207,6 +247,7 @@ const normalizeTrackChangeGetId: PostInvokeHook = (result, context) => {
     ...record,
     id: stableId,
     address: normalizedAddress ? { ...normalizedAddress, entityId: stableId } : record.address,
+    ...(record.overlap !== undefined ? { overlap: normalizeTrackChangeOverlap(record.overlap, rawToStableId) } : {}),
   };
 };
 

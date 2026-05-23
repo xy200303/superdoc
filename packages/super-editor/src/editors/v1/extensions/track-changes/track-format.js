@@ -44,6 +44,11 @@ export const TrackFormat = Mark.create({
         },
       },
 
+      authorId: {
+        default: '',
+        rendered: false,
+      },
+
       authorEmail: {
         default: '',
         parseDOM: (elem) => elem.getAttribute('data-authoremail'),

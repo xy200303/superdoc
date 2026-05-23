@@ -47,6 +47,7 @@ import { translator as wNumberingTranslator } from '@converter/v3/handlers/w/num
 import { baseNumbering } from '@converter/v2/exporter/helpers/base-list.definitions.js';
 import { patchNumberingDefinitions } from './patchNumberingDefinitions.js';
 import { startCollection, drainDiagnostics } from '@converter/v3/handlers/import-diagnostics.js';
+import { TRACKED_CHANGE_SOURCE_ID_MAP_PROPERTY } from '@extensions/track-changes/review-model/word-id-allocator.js';
 
 /**
  * @typedef {import()} XmlNode
@@ -95,6 +96,51 @@ const detectDocumentOrigin = (docx) => {
   return 'unknown';
 };
 
+const matchesElementName = (name, localName) => {
+  if (typeof name !== 'string') return false;
+  return name === localName || name.endsWith(`:${localName}`);
+};
+
+const readCustomProperty = (docx, propertyName) => {
+  try {
+    const customXml = docx?.['docProps/custom.xml'];
+    const properties = customXml?.elements?.find((el) => matchesElementName(el?.name, 'Properties'));
+    const property = properties?.elements?.find(
+      (el) => matchesElementName(el?.name, 'property') && el?.attributes?.name === propertyName,
+    );
+    const value = property?.elements?.[0]?.elements?.[0]?.text;
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+const parseTrackedChangeSourceIdMap = (raw) => {
+  if (typeof raw !== 'string' || raw.length === 0) return new Map();
+
+  try {
+    const parsed = JSON.parse(raw);
+    const parts = parsed && typeof parsed === 'object' ? parsed.parts : null;
+    if (!parts || typeof parts !== 'object') return new Map();
+
+    const byPart = new Map();
+    for (const [partPath, entries] of Object.entries(parts)) {
+      if (!partPath || !entries || typeof entries !== 'object') continue;
+      const byWordId = new Map();
+      for (const [wordId, sourceId] of Object.entries(entries)) {
+        if (typeof sourceId === 'string' && sourceId.length > 0) byWordId.set(wordId, sourceId);
+      }
+      if (byWordId.size > 0) byPart.set(partPath, byWordId);
+    }
+    return byPart;
+  } catch {
+    return new Map();
+  }
+};
+
+const readTrackedChangeSourceIdMap = (docx) =>
+  parseTrackedChangeSourceIdMap(readCustomProperty(docx, TRACKED_CHANGE_SOURCE_ID_MAP_PROPERTY));
+
 /**
  * Detect the document-level threading profile for comments based on file structure.
  * @param {ParsedDocx} docx The parsed docx object
@@ -125,6 +171,7 @@ export const createDocumentJson = (docx, converter, editor) => {
     importViewSettingFromSettings(docx, converter);
     converter.documentOrigin = detectDocumentOrigin(docx);
     converter.commentThreadingProfile = detectCommentThreadingProfile(docx);
+    converter.trackedChangeSourceIdMapByPart = readTrackedChangeSourceIdMap(docx);
   }
 
   const nodeListHandler = defaultNodeListHandler();

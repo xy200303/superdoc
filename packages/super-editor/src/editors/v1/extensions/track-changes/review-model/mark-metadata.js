@@ -221,6 +221,7 @@ const canonicalSourceIdsFromObject = (obj) => {
  * @property {string} importedAuthor      Imported author provenance.
  * @property {string} origin              Optional import origin.
  * @property {string} author              Display name.
+ * @property {string} authorId            Stable actor id.
  * @property {string} authorEmail         Author email (not lowercased here).
  * @property {string} authorImage         Author image url/value.
  * @property {string} date                Created/modified ISO date.
@@ -304,6 +305,7 @@ export const readTrackedAttrs = (markOrAttrs, markName) => {
     importedAuthor: stringAttr(attrs.importedAuthor),
     origin: explicitOrigin,
     author: stringAttr(attrs.author),
+    authorId: stringAttr(attrs.authorId),
     authorEmail: stringAttr(attrs.authorEmail),
     authorImage: stringAttr(attrs.authorImage),
     date: stringAttr(attrs.date),
@@ -357,6 +359,7 @@ export const normalizedAttrsEqual = (a, b) => {
   if (a.replacementSideId !== b.replacementSideId) return false;
   if (a.overlapParentId !== b.overlapParentId) return false;
   if (a.author !== b.author) return false;
+  if (a.authorId !== b.authorId) return false;
   if (a.authorEmail !== b.authorEmail) return false;
   if (a.authorImage !== b.authorImage) return false;
   if (a.date !== b.date) return false;

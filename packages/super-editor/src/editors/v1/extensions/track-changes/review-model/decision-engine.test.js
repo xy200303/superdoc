@@ -88,6 +88,47 @@ describe('decideTrackedChanges overlap behavior', () => {
     });
   });
 
+  it('accept insertion by id removes every same-id segment even when attrs differ across split text nodes', () => {
+    const schema = createReviewGraphTestSchema();
+    const { state } = stateFromTrackedSpans({
+      schema,
+      spans: [
+        { text: 'before ' },
+        {
+          text: 'N',
+          marks: [
+            {
+              markType: TrackInsertMarkName,
+              attrs: markAttrs({
+                id: 'ins-split',
+                author: SAME_USER.name,
+                authorEmail: SAME_USER.email,
+              }),
+            },
+          ],
+        },
+        { text: 'EW', marks: [{ markType: TrackInsertMarkName, attrs: insertAttrs('ins-split') }] },
+        { text: ' after' },
+      ],
+    });
+
+    const result = decideTrackedChanges({
+      state,
+      editor: editorFor(SAME_USER),
+      decision: 'accept',
+      target: { kind: 'id', id: 'ins-split' },
+    });
+
+    expect(result.ok).toBe(true);
+    const nextState = state.apply(result.tr);
+    expect(nextState.doc.textContent).toBe('before NEW after');
+    nextState.doc.nodesBetween(0, nextState.doc.content.size, (node) => {
+      if (node.isText) {
+        for (const mark of node.marks) expect(mark.type.name).not.toBe(TrackInsertMarkName);
+      }
+    });
+  });
+
   it('reject insertion by id removes inserted content atomically', () => {
     const schema = createReviewGraphTestSchema();
     const { state } = stateFromTrackedSpans({

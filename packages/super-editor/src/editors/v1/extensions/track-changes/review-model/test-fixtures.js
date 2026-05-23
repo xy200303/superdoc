@@ -30,6 +30,7 @@ const NODES = {
 const MARK_DEFS_WITH_GRAPH_ATTRS = {
   id: { default: '' },
   author: { default: '' },
+  authorId: { default: '' },
   authorEmail: { default: '' },
   authorImage: { default: '' },
   date: { default: '' },
@@ -111,6 +112,7 @@ export const stateFromTrackedSpans = ({ schema, spans }) => {
 export const markAttrs = (attrs) => ({
   id: '',
   author: '',
+  authorId: '',
   authorEmail: '',
   authorImage: '',
   date: '',

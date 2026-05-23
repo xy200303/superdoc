@@ -33,6 +33,13 @@ import { BODY_STORY, buildStoryKey } from './story-locator.js';
 // ---------------------------------------------------------------------------
 
 /**
+ * @typedef {Object} TrackedMarkRun
+ * @property {number} from
+ * @property {number} to
+ * @property {import('prosemirror-model').Mark} mark
+ */
+
+/**
  * @typedef {Object} TrackedSegment
  * @property {string} segmentId
  * @property {string} changeId
@@ -42,6 +49,7 @@ import { BODY_STORY, buildStoryKey } from './story-locator.js';
  * @property {number} to
  * @property {string} text
  * @property {import('prosemirror-model').Mark} mark
+ * @property {Array<TrackedMarkRun>} markRuns
  * @property {import('./mark-metadata.js').NormalizedTrackedAttrs} attrs
  * @property {string} parentId
  * @property {string} parentSide
@@ -71,6 +79,7 @@ import { BODY_STORY, buildStoryKey } from './story-locator.js';
  * @property {Array<TrackedSegment>} formattingSegments
  * @property {LogicalReplacementProjection | null} replacement
  * @property {string} author
+ * @property {string} authorId
  * @property {string} authorEmail
  * @property {string} authorImage
  * @property {string} date
@@ -327,6 +336,7 @@ const mergeAdjacentSpans = (normalized) => {
 
     if (canMerge) {
       last.to = span.to;
+      last.markRuns.push({ from: span.from, to: span.to, mark: span.mark });
       continue;
     }
 
@@ -346,6 +356,7 @@ const mergeAdjacentSpans = (normalized) => {
       to: span.to,
       text: '',
       mark: span.mark,
+      markRuns: [{ from: span.from, to: span.to, mark: span.mark }],
       attrs,
       parentId: attrs.overlapParentId || '',
       parentSide: '',
@@ -474,6 +485,7 @@ const buildLogicalChange = ({ changeId, segments, doc, story, replacementsMode }
     formattingSegments: formatting,
     replacement,
     author: primary?.author ?? '',
+    authorId: primary?.authorId ?? '',
     authorEmail: primary?.authorEmail ?? '',
     authorImage: primary?.authorImage ?? '',
     date: primary?.date ?? '',

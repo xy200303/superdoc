@@ -93,8 +93,8 @@ export interface AwarenessUser extends User {
  * The runtime helper `awarenessStatesToArray` spreads each remote user
  * onto the top of the entry (`{ clientId, ...value.user, color }`), so
  * `User` fields like `name`, `email`, `image` appear at the top level
- * (not nested under a `user` property). Consumers should read
- * `state.name` / `state.email`, not `state.user.name`.
+ * (not nested under a `user` property). Consumers should read `state.id`,
+ * `state.name`, and `state.email`, not `state.user.name`.
  *
  * Application-specific fields attached to the awareness state by the
  * provider surface through the `[key: string]: unknown` index

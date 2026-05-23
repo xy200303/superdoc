@@ -151,6 +151,23 @@ describe('permission-helpers', () => {
     );
   });
 
+  it('treats same-email different actor ids as other-user changes', () => {
+    const mockResolver = vi.fn(() => true);
+    editor.options.permissionResolver = mockResolver;
+    editor.options.user = { id: 'owner-id', email: 'shared@example.com' };
+
+    const result = isTrackedChangeActionAllowed({
+      editor,
+      action: 'accept',
+      trackedChanges: [{ id: 'case-match', attrs: { authorId: 'other-id', authorEmail: 'shared@example.com' } }],
+    });
+
+    expect(result).toBe(true);
+    expect(mockResolver).toHaveBeenCalledWith(
+      expect.objectContaining({ permission: 'RESOLVE_OTHER', trackedChange: expect.any(Object) }),
+    );
+  });
+
   it('isTrackedChangeActionAllowed short-circuits when any resolver call denies access', () => {
     const mockResolver = vi.fn(({ permission }) => permission !== 'REJECT_OTHER');
     editor.options.permissionResolver = mockResolver;

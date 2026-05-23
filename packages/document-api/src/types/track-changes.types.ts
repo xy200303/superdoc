@@ -3,6 +3,19 @@ import type { DiscoveryOutput } from './discovery.js';
 import type { StoryLocator } from './story.types.js';
 
 export type TrackChangeType = 'insert' | 'delete' | 'format';
+export type TrackChangeOverlapRelationship = 'parent' | 'child' | 'standalone';
+
+export interface TrackChangeOverlapLayer {
+  id: string;
+  type: TrackChangeType;
+  relationship: TrackChangeOverlapRelationship;
+}
+
+export interface TrackChangeOverlapInfo {
+  visualLayers?: TrackChangeOverlapLayer[];
+  preferredContextTargetId?: string;
+  preferredContextTarget?: TrackChangeOverlapLayer;
+}
 
 /**
  * Scope marker used by {@link TrackChangesListQuery.in} to request changes
@@ -34,6 +47,8 @@ export interface TrackChangeInfo {
   type: TrackChangeType;
   /** Raw imported Word OOXML revision IDs (`w:id`) from the source document when available. */
   wordRevisionIds?: TrackChangeWordRevisionIds;
+  /** Overlap metadata for nested tracked changes that share the same text range. */
+  overlap?: TrackChangeOverlapInfo;
   author?: string;
   authorEmail?: string;
   authorImage?: string;
@@ -66,6 +81,8 @@ export interface TrackChangeDomain {
   type: TrackChangeType;
   /** Raw imported Word OOXML revision IDs (`w:id`) from the source document when available. */
   wordRevisionIds?: TrackChangeWordRevisionIds;
+  /** Overlap metadata for nested tracked changes that share the same text range. */
+  overlap?: TrackChangeOverlapInfo;
   author?: string;
   authorEmail?: string;
   authorImage?: string;

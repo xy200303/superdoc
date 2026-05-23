@@ -1,12 +1,7 @@
 import { ReplaceStep } from 'prosemirror-transform';
 import { Slice } from 'prosemirror-model';
-import { Selection, TextSelection } from 'prosemirror-state';
-import { markInsertion } from './markInsertion.js';
-import { markDeletion } from './markDeletion.js';
-import { TrackDeleteMarkName } from '../constants.js';
 import { TrackChangesBasePluginKey } from '../plugins/index.js';
 import { CommentsPluginKey } from '../../comment/comments-plugin.js';
-import { findMarkPosition } from './documentHelpers.js';
 import { compileTrackedEdit } from '../review-model/overlap-compiler.js';
 import { makeTextInsertIntent, makeTextDeleteIntent, makeTextReplaceIntent } from '../review-model/edit-intent.js';
 
@@ -182,6 +177,7 @@ export const replaceStep = ({
     step,
     stepWasNormalized,
     originalStep,
+    originalStepIndex,
     map,
     user,
     date,
@@ -197,13 +193,13 @@ export const replaceStep = ({
 
   // Handle structural deletions with no inline content (e.g., empty paragraph removal,
   // paragraph joins). When there's no content being inserted and no inline content in
-  // the deletion range, markDeletion has nothing to mark — apply the step directly.
+  // the deletion range, there is no tracked inline content for the compiler to mark, so
+  // apply the structural step directly.
   //
   // Edge case: if a paragraph contains only TrackDelete-marked text, hasInlineContent
-  // returns true and the normal tracking flow runs. markDeletion skips already-deleted
-  // nodes, but the join still applies through the replace machinery — the delete is
-  // not swallowed. This is correct: the structural join merges the blocks while
-  // preserving the existing deletion marks on the text content.
+  // returns true and the compiler path runs. If the compiler cannot represent that
+  // mixed text/structure operation, the edit fails closed rather than applying
+  // untracked content.
   if (step.from !== step.to && step.slice.content.size === 0) {
     let hasInlineContent = false;
     newTr.doc.nodesBetween(step.from, step.to, (node) => {
@@ -220,188 +216,11 @@ export const replaceStep = ({
       return;
     }
   }
-
-  const trTemp = state.apply(newTr).tr;
-
-  // Default: insert replacement after the selected range (Word-like replace behavior).
-  // If the selection ends inside an existing deletion, move insertion to after that deletion span.
-  // NOTE: Only adjust position for single-step transactions. Multi-step transactions (like input rules)
-  // have subsequent steps that depend on original positions, and adjusting breaks their mapping.
-  let positionTo = step.to;
-  const isSingleStep = tr.steps.length === 1;
-
-  if (isSingleStep) {
-    const probePos = Math.max(step.from, step.to - 1);
-    const deletionSpan = findMarkPosition(trTemp.doc, probePos, TrackDeleteMarkName);
-    if (deletionSpan && deletionSpan.to > positionTo) {
-      positionTo = deletionSpan.to;
-    }
-  }
-
-  // When pasting into a textblock, try the open slice first so content merges inline
-  // instead of creating new paragraphs (prevents inserting block nodes into non-textblocks).
-  const baseParentIsTextblock = trTemp.doc.resolve(positionTo).parent?.isTextblock;
-  const shouldPreferInlineInsertion = step.from === step.to && baseParentIsTextblock;
-
-  const tryInsert = (slice) => {
-    const tempTr = state.apply(newTr).tr;
-    // Empty slices represent pure deletions (no content to insert).
-    // Detecting them ensures deletion tracking runs even if `tempTr` doesn't change.
-    const isEmptySlice = slice?.content?.size === 0;
-    try {
-      tempTr.replaceRange(positionTo, positionTo, slice);
-    } catch {
-      return null;
-    }
-
-    if (!tempTr.docChanged && !isEmptySlice) return null;
-
-    const insertedFrom = tempTr.mapping.map(positionTo, -1);
-    const insertedTo = tempTr.mapping.map(positionTo, 1);
-    if (insertedFrom === insertedTo) return { tempTr, insertedFrom, insertedTo };
-    if (shouldPreferInlineInsertion && !tempTr.doc.resolve(insertedFrom).parent?.isTextblock) return null;
-    return { tempTr, insertedFrom, insertedTo };
-  };
-
-  const openSlice = Slice.maxOpen(step.slice.content, true);
-  const insertion = tryInsert(step.slice) || tryInsert(openSlice);
-
-  // If we can't insert the replacement content into the temp transaction, fall back to applying the original step.
-  // This keeps user intent (content change) even if we can't represent it as tracked insert+delete.
-  if (!insertion) {
-    if (!newTr.maybeStep(step).failed) {
-      map.appendMap(step.getMap());
-    }
-    return;
-  }
-
-  const meta = {};
-  const { insertedFrom, insertedTo, tempTr } = insertion;
-  let insertedMark = null;
-  let trackedInsertedSlice = Slice.empty;
-
-  if (insertedFrom !== insertedTo) {
-    insertedMark = markInsertion({
-      tr: tempTr,
-      from: insertedFrom,
-      to: insertedTo,
-      user,
-      date,
-    });
-    trackedInsertedSlice = tempTr.doc.slice(insertedFrom, insertedTo);
-  }
-
-  // Condense insertion down to a single replace step (so this tracked transaction remains a single-step insertion).
-  const docBeforeCondensedStep = newTr.doc;
-  const condensedStep = new ReplaceStep(positionTo, positionTo, trackedInsertedSlice, false);
-  if (newTr.maybeStep(condensedStep).failed) {
-    // If the condensed step can't be applied, fall back to the original step and skip deletion tracking.
-    if (!newTr.maybeStep(step).failed) {
-      map.appendMap(step.getMap());
-    }
-    return;
-  }
-
-  // We didn't apply the original step in its original place. We adjust the map accordingly.
-  // When stepWasNormalized is true, `step` is already in the mapped position space
-  // (originalStep.map(map) was applied before entering replaceStep). Calling .map(map)
-  // again would double-map positions and corrupt subsequent step/selection mapping
-  // in multi-step transactions.
-  const invertSourceStep = stepWasNormalized ? step : originalStep;
-  const invertSourceDoc = stepWasNormalized ? docBeforeCondensedStep : tr.docs[originalStepIndex];
-  const invertStep = stepWasNormalized
-    ? invertSourceStep.invert(invertSourceDoc)
-    : invertSourceStep.invert(invertSourceDoc).map(map);
-  map.appendMap(invertStep.getMap());
-  const mirrorIndex = map.maps.length - 1;
-  map.appendMap(condensedStep.getMap(), mirrorIndex);
-
-  if (insertedFrom !== insertedTo) {
-    meta.insertedMark = insertedMark;
-    meta.step = condensedStep;
-    // Store insertion end position when (1) we adjusted the insertion position (e.g. past a
-    // deletion span), or (2) single-step replace of a range — selection mapping is wrong then
-    // so we need an explicit caret position. Skip for multi-step (e.g. input rules) so their
-    // intended selection is preserved.
-    const needInsertedTo = positionTo !== step.to || (isSingleStep && step.from !== step.to);
-    if (needInsertedTo) {
-      const insertionLength = insertedTo - insertedFrom;
-      meta.insertedTo = positionTo + insertionLength;
-    }
-  }
-
-  if (!newTr.selection.eq(tempTr.selection)) {
-    syncSelectionFromTransaction({ targetTr: newTr, sourceSelection: tempTr.selection });
-  }
-
-  if (step.from !== step.to) {
-    const {
-      deletionMark,
-      deletionMap,
-      nodes: deletionNodes,
-    } = markDeletion({
-      tr: newTr,
-      from: step.from,
-      to: step.to,
-      user,
-      date,
-      // SD-2607: in 'paired' mode (default), share the insertion's id so the
-      // two halves of a user-driven replacement resolve together. In
-      // 'independent' mode, pass undefined so markDeletion mints its own id
-      // — making the deletion an independent revision per ECMA-376 §17.13.5.
-      id: replacements === 'paired' ? meta.insertedMark?.attrs?.id : undefined,
-    });
-
-    meta.deletionNodes = deletionNodes;
-    meta.deletionMark = deletionMark;
-
-    // Map insertedTo through deletionMap to account for position shifts from removing
-    // the user's own prior insertions (which markDeletion deletes instead of marking).
-    if (meta.insertedTo !== undefined) {
-      meta.insertedTo = deletionMap.map(meta.insertedTo, 1);
-    }
-
-    // Normalized broad -> single-char deletions should keep the caret at the
-    // normalized deletion edge, not the original broad transaction selection.
-    // This avoids follow-up Backspace events targeting structural boundaries.
-    if (stepWasNormalized && !meta.insertedMark) {
-      meta.selectionPos = deletionMap.map(step.from, -1);
-    }
-
-    map.appendMapping(deletionMap);
-  }
-
-  // Add meta to the new transaction.
-  newTr.setMeta(TrackChangesBasePluginKey, meta);
-  newTr.setMeta(CommentsPluginKey, { type: 'force' });
+  // Every text-shaped tracked edit must be represented by compileTrackedEdit.
+  // If the compiler declined and the structural branch above did not apply,
+  // fail closed instead of keeping a second tracked-write implementation here.
 };
 
-/**
- * Copies a selection from one transaction into another transaction that has a different
- * document instance, while guaranteeing the resulting selection is valid for the target doc.
- *
- * ProseMirror selections are bound to a specific document object. Reusing a `Selection`
- * created from another transaction can throw:
- * `Selection passed to setSelection must point at the current document`.
- *
- * This helper performs a safe transfer strategy:
- * 1. Clamp source selection positions to the target document bounds.
- * 2. Recreate `TextSelection` directly on the target doc when possible.
- * 3. If recreation fails (for example, target endpoints are no longer valid text positions),
- *    fall back to `Selection.near(...)` so caret placement still succeeds.
- * 4. For non-text selections, use the same `Selection.near(...)` fallback.
- *
- * The intent is to preserve cursor location as closely as possible without ever throwing
- * during tracked replay.
- *
- * @param {{ targetTr: import('prosemirror-state').Transaction, sourceSelection: import('prosemirror-state').Selection }} options
- * @param {import('prosemirror-state').Transaction} options.targetTr
- *   Transaction that should receive the selection. The resulting selection is always created
- *   against `targetTr.doc`.
- * @param {import('prosemirror-state').Selection} options.sourceSelection
- *   Selection taken from another transaction/document context.
- * @returns {void}
- */
 /**
  * Try to route a text-shaped ReplaceStep through the overlap-aware compiler.
  *
@@ -410,13 +229,25 @@ export const replaceStep = ({
  *  - `{ failed: true }`   — compiler aborted (typed failure); caller must
  *                          NOT fall back to the original untracked step.
  *  - `{ handled: false }` — compiler declined (e.g. structural step
- *                          without inline content). Caller falls through
- *                          to the legacy path.
+ *                          without inline content). Caller may run the
+ *                          narrow structural fallback below.
  *
  * @param {{ state: import('prosemirror-state').EditorState, tr: import('prosemirror-state').Transaction, newTr: import('prosemirror-state').Transaction, step: import('prosemirror-transform').ReplaceStep, stepWasNormalized: boolean, originalStep: import('prosemirror-transform').ReplaceStep, map: import('prosemirror-transform').Mapping, user: object, date: string, replacements: 'paired'|'independent' }} options
  */
-const tryCompileStep = ({ state, tr, newTr, step, stepWasNormalized, originalStep, map, user, date, replacements }) => {
-  // Empty structural deletion handled by the existing legacy branch above.
+const tryCompileStep = ({
+  state,
+  tr,
+  newTr,
+  step,
+  stepWasNormalized,
+  originalStep,
+  originalStepIndex,
+  map,
+  user,
+  date,
+  replacements,
+}) => {
+  // Empty structural deletion handled by the structural branch above.
   if (step.from !== step.to && step.slice.content.size === 0) {
     let hasInlineContent = false;
     newTr.doc.nodesBetween(step.from, step.to, (node) => {
@@ -446,6 +277,11 @@ const tryCompileStep = ({ state, tr, newTr, step, stepWasNormalized, originalSte
         date,
         source: 'native',
       });
+      // Single-step user actions (text replace from one ReplaceStep) probe
+      // for adjacent tracked-delete spans so insertion lands past the
+      // strike-through content. Multi-step transactions (input rules,
+      // plan-engine multi-op rewrites) must not probe.
+      if (tr.steps.length === 1) /** @type {any} */ (intent).probeForDeletionSpan = true;
     } else {
       // Zero-op step; nothing to compile.
       return { handled: false };
@@ -456,6 +292,7 @@ const tryCompileStep = ({ state, tr, newTr, step, stepWasNormalized, originalSte
 
   const beforeSize = newTr.doc.content.size;
   const beforeSteps = newTr.steps.length;
+  const newTrDocBeforeCompile = newTr.doc;
   const result = compileTrackedEdit({
     state,
     tr: newTr,
@@ -464,22 +301,44 @@ const tryCompileStep = ({ state, tr, newTr, step, stepWasNormalized, originalSte
   });
 
   if (!result.ok) {
-    // Structural fallback: when the compiler reports CAPABILITY_UNAVAILABLE
-    // for a content shape it cannot model (e.g. mixed structural slice), let
-    // the legacy path handle it. Otherwise — INVALID_TARGET or
-    // PRECONDITION_FAILED — fail closed.
-    if (result.code === 'CAPABILITY_UNAVAILABLE') return { handled: false };
     return { failed: true, error: new Error(result.message) };
   }
 
-  // Track that we mutated newTr. We still need to update the outer mapping
-  // (`map`) so subsequent steps in the same transaction can map through.
-  for (let i = beforeSteps; i < newTr.steps.length; i += 1) {
-    map.appendMap(newTr.steps[i].getMap());
+  // Update the outer mapping (`map`) so subsequent original steps in the
+  // same transaction remap correctly into newTr.doc space. We didn't apply
+  // the original step in its original place (we applied a condensed insert
+  // at positionTo plus delete marks). For trackedTransaction's
+  // `originalStep.map(map)` to land subsequent steps where the user expected,
+  // the outer map must encode the original step's user-view position effect.
+  // Mirror the legacy invert+condensed dance: append the inverse of the
+  // source step (cancels the original step's expected map) then mirror-append
+  // the compiled steps (what we actually did to newTr).
+  const invertSourceStep = stepWasNormalized ? step : originalStep;
+  const invertSourceDoc = stepWasNormalized ? newTrDocBeforeCompile : tr.docs[originalStepIndex];
+  let invertStep;
+  try {
+    invertStep = stepWasNormalized
+      ? invertSourceStep.invert(invertSourceDoc)
+      : invertSourceStep.invert(invertSourceDoc).map(map);
+  } catch {
+    invertStep = null;
   }
 
-  // Mirror the position-mapping behavior expected by trackedTransaction
-  // selection logic: when there is an inserted side, record `insertedTo`.
+  if (invertStep) {
+    map.appendMap(invertStep.getMap());
+    const mirrorIndex = map.maps.length - 1;
+    for (let i = beforeSteps; i < newTr.steps.length; i += 1) {
+      map.appendMap(newTr.steps[i].getMap(), mirrorIndex);
+    }
+  } else {
+    for (let i = beforeSteps; i < newTr.steps.length; i += 1) {
+      map.appendMap(newTr.steps[i].getMap());
+    }
+  }
+
+  // Build comments-plugin-shaped metadata directly from the compiler result
+  // so the bubble pipeline can derive inserted/deleted text immediately
+  // (without fake step.slice payloads).
   const meta = {};
   if (typeof result.insertedTo === 'number') {
     meta.insertedTo = result.insertedTo;
@@ -487,8 +346,22 @@ const tryCompileStep = ({ state, tr, newTr, step, stepWasNormalized, originalSte
   if (result.insertedMark) {
     meta.insertedMark = result.insertedMark;
   }
-  if (result.deletionMarks?.length) {
+  if (result.deletionMark) {
+    meta.deletionMark = result.deletionMark;
+  } else if (result.deletionMarks?.length) {
     meta.deletionMark = result.deletionMarks[0];
+  }
+  if (result.deletionNodes?.length) {
+    meta.deletionNodes = result.deletionNodes;
+  }
+  if (result.insertedMark && result.insertedStep) {
+    // Pass the real condensed ReplaceStep so the comments plugin can read
+    // step.slice.content (Fragment) just like the legacy code did.
+    meta.step = result.insertedStep;
+  } else if (result.insertedMark && result.insertedNodes?.length) {
+    // Compiler paths that don't produce a single condensed ReplaceStep —
+    // fall back to a shaped step the comments plugin already understands.
+    meta.step = { slice: { content: { content: result.insertedNodes } } };
   }
   if (result.selection?.kind === 'near' && stepWasNormalized && !result.insertedMark) {
     meta.selectionPos = result.selection.pos;
@@ -497,21 +370,4 @@ const tryCompileStep = ({ state, tr, newTr, step, stepWasNormalized, originalSte
   newTr.setMeta(CommentsPluginKey, { type: 'force' });
 
   return { handled: true, sizeDelta: newTr.doc.content.size - beforeSize };
-};
-
-const syncSelectionFromTransaction = ({ targetTr, sourceSelection }) => {
-  const boundedFrom = Math.max(0, Math.min(sourceSelection.from, targetTr.doc.content.size));
-  const boundedTo = Math.max(0, Math.min(sourceSelection.to, targetTr.doc.content.size));
-
-  if (sourceSelection instanceof TextSelection) {
-    try {
-      targetTr.setSelection(TextSelection.create(targetTr.doc, boundedFrom, boundedTo));
-      return;
-    } catch {
-      targetTr.setSelection(Selection.near(targetTr.doc.resolve(boundedFrom), -1));
-      return;
-    }
-  }
-
-  targetTr.setSelection(Selection.near(targetTr.doc.resolve(boundedFrom), -1));
 };

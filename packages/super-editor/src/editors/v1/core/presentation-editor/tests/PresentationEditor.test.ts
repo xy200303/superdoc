@@ -3323,6 +3323,51 @@ describe('PresentationEditor', () => {
       expect(sessionEditor?.view.focus).toHaveBeenCalled();
     });
 
+    it('resolves public Word tracked-change ids to runtime mark ids during story navigation', async () => {
+      const { sessionEditor } = await activateFootnoteSession();
+      const setCursorById = vi.fn((id: string) => id === 'runtime-note-1');
+      if (sessionEditor?.commands) {
+        sessionEditor.commands.setCursorById = setCursorById;
+      }
+      if (sessionEditor?.state?.doc) {
+        sessionEditor.state.doc.descendants = vi.fn((callback: (node: unknown, pos: number) => void) => {
+          callback(
+            {
+              isInline: true,
+              nodeSize: 13,
+              text: 'FN_TC_CHARLIE',
+              marks: [
+                {
+                  type: { name: 'trackInsert' },
+                  attrs: {
+                    id: 'runtime-note-1',
+                    sourceId: '101',
+                    author: 'Story Harness',
+                    date: '2024-01-01T00:00:00Z',
+                  },
+                },
+              ],
+            },
+            2,
+          );
+        });
+      }
+
+      const didNavigate = await editor.navigateTo({
+        kind: 'entity',
+        entityType: 'trackedChange',
+        entityId: 'word:trackInsert:101',
+        story: { kind: 'story', storyType: 'footnote', noteId: '1' },
+      });
+
+      expect(didNavigate).toBe(true);
+      expect(setCursorById).toHaveBeenCalledWith('word:trackInsert:101', {
+        preferredActiveThreadId: 'word:trackInsert:101',
+      });
+      expect(setCursorById).toHaveBeenCalledWith('runtime-note-1', { preferredActiveThreadId: 'runtime-note-1' });
+      expect(sessionEditor?.view.focus).toHaveBeenCalled();
+    });
+
     it('falls back to rendered tracked-change stamps for inactive non-body stories', async () => {
       const { viewport } = await prepareFootnoteEditor();
       const page = document.createElement('div');

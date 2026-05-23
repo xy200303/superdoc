@@ -21,6 +21,8 @@ import { Schema } from 'prosemirror-model';
 const ALICE = { name: 'Alice', email: 'alice@example.com' };
 const BOB = { name: 'Bob', email: 'bob@example.com' };
 const NO_EMAIL = { name: 'Anon', email: '' };
+const SAME_EMAIL_ALICE = { id: 'alice-id', name: 'Alice', email: 'shared@example.com' };
+const SAME_EMAIL_BOB = { id: 'bob-id', name: 'Bob', email: 'shared@example.com' };
 
 const FIXED_DATE = '2026-05-21T00:00:00.000Z';
 
@@ -342,6 +344,102 @@ describe('overlap-compiler: text-delete', () => {
     expect(aliceChange.deletedSegments[0].attrs.overlapParentId).toBe(parentId);
   });
 
+  it('treats same-email different-id collaborators as different users', () => {
+    const parentId = 'ins-shared';
+    const { state } = stateFromTrackedSpans({
+      schema,
+      spans: [
+        { text: 'Hi ' },
+        {
+          text: 'world',
+          marks: [
+            insertMark({
+              id: parentId,
+              author: SAME_EMAIL_ALICE.name,
+              authorId: SAME_EMAIL_ALICE.id,
+              authorEmail: SAME_EMAIL_ALICE.email,
+              date: FIXED_DATE,
+            }),
+          ],
+        },
+      ],
+    });
+
+    const intent = makeTextDeleteIntent({
+      from: 5,
+      to: 7,
+      user: SAME_EMAIL_BOB,
+      date: FIXED_DATE,
+      source: 'native',
+    });
+    const result = runCompile({ state, intent });
+
+    expect(result.ok).toBe(true);
+    expect(textOf(result.tr)).toBe('Hi world');
+    const graph = buildReviewGraph({ state: { doc: result.tr.doc } });
+    const bobChange = Array.from(graph.changes.values()).find((c) => c.authorId === SAME_EMAIL_BOB.id);
+    expect(bobChange).toBeDefined();
+    expect(bobChange.type).toBe(CanonicalChangeType.Deletion);
+    expect(bobChange.deletedSegments[0].attrs.overlapParentId).toBe(parentId);
+  });
+
+  it('protects named no-email insertion as different-user state when deleting inside it', () => {
+    const parentId = 'ins-alice-no-email';
+    const { state } = stateFromTrackedSpans({
+      schema,
+      spans: [
+        {
+          text: 'lazy ',
+          marks: [
+            insertMark({
+              id: parentId,
+              author: '',
+              importedAuthor: 'Alice Reviewer (imported)',
+              authorEmail: '',
+              date: FIXED_DATE,
+            }),
+          ],
+        },
+      ],
+    });
+    const intent = makeTextDeleteIntent({
+      from: 1,
+      to: 5,
+      user: { name: 'CLI', email: '' },
+      date: FIXED_DATE,
+      source: 'document-api',
+    });
+    const result = runCompile({ state, intent });
+    expect(result.ok).toBe(true);
+    expect(textOf(result.tr)).toBe('lazy ');
+
+    const graph = buildReviewGraph({ state: { doc: result.tr.doc } });
+    expect(graph.changes.size).toBe(2);
+    const parent = graph.changes.get(parentId);
+    expect(parent).toBeDefined();
+    expect(parent.type).toBe(CanonicalChangeType.Insertion);
+    const child = Array.from(graph.changes.values()).find((change) => change.id !== parentId);
+    expect(child).toBeDefined();
+    expect(child.type).toBe(CanonicalChangeType.Deletion);
+    expect(child.deletedSegments[0].text).toBe('lazy');
+    expect(child.deletedSegments[0].attrs.overlapParentId).toBe(parentId);
+  });
+
+  it('collapses truly unattributed no-email insertion when deleting it', () => {
+    const parentId = 'ins-unattributed';
+    const { state } = stateFromTrackedSpans({
+      schema,
+      spans: [{ text: 'draft', marks: [insertMark({ id: parentId, author: '', authorEmail: '', date: FIXED_DATE })] }],
+    });
+    const intent = makeTextDeleteIntent({ from: 1, to: 6, user: BOB, date: FIXED_DATE, source: 'document-api' });
+    const result = runCompile({ state, intent });
+    expect(result.ok).toBe(true);
+    expect(textOf(result.tr)).toBe('');
+    const graph = buildReviewGraph({ state: { doc: result.tr.doc } });
+    expect(graph.changes.size).toBe(0);
+    expect(result.removedChangeIds).toEqual([parentId]);
+  });
+
   it('no-ops when deleting inside own deletion', () => {
     const delId = 'del-alice';
     const { state } = stateFromTrackedSpans({
@@ -358,6 +456,59 @@ describe('overlap-compiler: text-delete', () => {
     // Only the original deletion remains.
     expect(graph.changes.size).toBe(1);
     expect(Array.from(graph.changes.values())[0].id).toBe(delId);
+  });
+});
+
+describe('overlap-compiler: text-replace inside named no-email insertion', () => {
+  it('preserves parent insertion and creates child replacement sides', () => {
+    const parentId = 'ins-alice-no-email';
+    const { state } = stateFromTrackedSpans({
+      schema,
+      spans: [
+        {
+          text: 'lazy ',
+          marks: [
+            insertMark({
+              id: parentId,
+              author: '',
+              importedAuthor: 'Alice Reviewer (imported)',
+              authorEmail: '',
+              date: FIXED_DATE,
+            }),
+          ],
+        },
+      ],
+    });
+    const intent = makeTextReplaceIntent({
+      from: 1,
+      to: 5,
+      content: sliceFromText(schema, 'quickly'),
+      replacements: 'paired',
+      user: { name: 'CLI', email: '' },
+      date: FIXED_DATE,
+      source: 'document-api',
+    });
+    const result = runCompile({ state, intent });
+    expect(result.ok).toBe(true);
+    expect(textOf(result.tr)).toBe('lazyquickly ');
+
+    const graph = buildReviewGraph({ state: { doc: result.tr.doc } });
+    expect(graph.changes.size).toBe(3);
+    const parent = graph.changes.get(parentId);
+    expect(parent).toBeDefined();
+    expect(parent.type).toBe(CanonicalChangeType.Insertion);
+    const childDelete = Array.from(graph.changes.values()).find(
+      (change) => change.type === CanonicalChangeType.Deletion,
+    );
+    const childInsert = Array.from(graph.changes.values()).find(
+      (change) => change.type === CanonicalChangeType.Insertion && change.id !== parentId,
+    );
+    expect(childDelete).toBeDefined();
+    expect(childDelete.deletedSegments[0].text).toBe('lazy');
+    expect(childDelete.deletedSegments[0].attrs.overlapParentId).toBe(parentId);
+    expect(childInsert).toBeDefined();
+    expect(childInsert.insertedSegments.map((segment) => segment.text).join('')).toBe('quickly');
+    expect(childInsert.insertedSegments[0].attrs.overlapParentId).toBe(parentId);
   });
 });
 
@@ -533,6 +684,50 @@ describe('overlap-compiler: format folding (SD-486)', () => {
       if (node.marks.some((m) => m.type.name === 'bold')) hasBold = true;
     });
     expect(hasBold).toBe(true);
+  });
+
+  it('folds same-user insertion formatting while tracking adjacent live text in the same operation', () => {
+    const id = 'ins-alice';
+    const { state } = makeBoldedDoc([
+      { text: 'Hi ' },
+      { text: 'world', marks: [insertMark({ id, authorEmail: ALICE.email, date: FIXED_DATE })] },
+      { text: ' tail' },
+    ]);
+    const boldMark = schemaWithBold.marks.bold.create();
+    const intent = makeFormatIntent({
+      kind: 'format-apply',
+      from: 4,
+      to: 14,
+      mark: boldMark,
+      user: ALICE,
+      date: FIXED_DATE,
+      source: 'native',
+    });
+    const result = runCompile({ state, intent });
+    expect(result.ok).toBe(true);
+    expect(result.createdChangeIds).toHaveLength(1);
+    expect(result.formatMarks).toHaveLength(1);
+
+    let insertionHasBold = false;
+    let insertionHasTrackFormat = false;
+    let liveHasBold = false;
+    let liveHasTrackFormat = false;
+    result.tr.doc.descendants((node) => {
+      if (!node.isText) return;
+      if (node.text.includes('world')) {
+        insertionHasBold = node.marks.some((m) => m.type.name === 'bold');
+        insertionHasTrackFormat = node.marks.some((m) => m.type.name === TrackFormatMarkName);
+      }
+      if (node.text.includes(' tail')) {
+        liveHasBold = node.marks.some((m) => m.type.name === 'bold');
+        liveHasTrackFormat = node.marks.some((m) => m.type.name === TrackFormatMarkName);
+      }
+    });
+
+    expect(insertionHasBold).toBe(true);
+    expect(insertionHasTrackFormat).toBe(false);
+    expect(liveHasBold).toBe(true);
+    expect(liveHasTrackFormat).toBe(true);
   });
 
   it('creates a trackFormat over different-user inserted content', () => {

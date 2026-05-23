@@ -5,6 +5,7 @@ import {
   getChangeAuthorIdentity,
   classifyOwnership,
   isSameUserHighConfidence,
+  matchesSameUserRefinement,
 } from './identity.js';
 
 describe('review-model/identity', () => {
@@ -25,61 +26,111 @@ describe('review-model/identity', () => {
 
   describe('getCurrentUserIdentity', () => {
     it('extracts identity from a configured editor', () => {
-      const editor = { options: { user: { name: 'Alice', email: 'Alice@example.com' } } };
+      const editor = { options: { user: { id: 'alice-id', name: 'Alice', email: 'Alice@example.com' } } };
       expect(getCurrentUserIdentity(editor)).toEqual({
+        id: 'alice-id',
         email: 'alice@example.com',
         name: 'Alice',
+        hasId: true,
         hasEmail: true,
       });
     });
     it('returns empty identity for missing editor/user', () => {
-      expect(getCurrentUserIdentity(undefined)).toEqual({ email: '', name: '', hasEmail: false });
-      expect(getCurrentUserIdentity({ options: {} })).toEqual({ email: '', name: '', hasEmail: false });
+      expect(getCurrentUserIdentity(undefined)).toEqual({ id: '', email: '', name: '', hasId: false, hasEmail: false });
+      expect(getCurrentUserIdentity({ options: {} })).toEqual({
+        id: '',
+        email: '',
+        name: '',
+        hasId: false,
+        hasEmail: false,
+      });
     });
   });
 
   describe('getChangeAuthorIdentity', () => {
     it('reads from a raw mark', () => {
-      const mark = { attrs: { author: 'Bob', authorEmail: 'BOB@example.com' } };
-      expect(getChangeAuthorIdentity(mark)).toEqual({ email: 'bob@example.com', name: 'Bob', hasEmail: true });
+      const mark = { attrs: { author: 'Bob', authorId: 'bob-id', authorEmail: 'BOB@example.com' } };
+      expect(getChangeAuthorIdentity(mark)).toEqual({
+        id: 'bob-id',
+        email: 'bob@example.com',
+        name: 'Bob',
+        hasId: true,
+        hasEmail: true,
+      });
     });
     it('reads from flat attrs', () => {
-      expect(getChangeAuthorIdentity({ author: 'Carol', authorEmail: 'carol@example.com' })).toEqual({
+      expect(
+        getChangeAuthorIdentity({ author: 'Carol', authorId: 'carol-id', authorEmail: 'carol@example.com' }),
+      ).toEqual({
+        id: 'carol-id',
         email: 'carol@example.com',
         name: 'Carol',
+        hasId: true,
         hasEmail: true,
       });
     });
     it('returns empty for null', () => {
-      expect(getChangeAuthorIdentity(null)).toEqual({ email: '', name: '', hasEmail: false });
+      expect(getChangeAuthorIdentity(null)).toEqual({ id: '', email: '', name: '', hasId: false, hasEmail: false });
     });
   });
 
   describe('classifyOwnership', () => {
-    const alice = { email: 'alice@example.com', name: 'Alice', hasEmail: true };
-    const bob = { email: 'bob@example.com', name: 'Bob', hasEmail: true };
+    const alice = { id: 'alice-id', email: 'alice@example.com', name: 'Alice', hasId: true, hasEmail: true };
+    const bob = { id: 'bob-id', email: 'bob@example.com', name: 'Bob', hasId: true, hasEmail: true };
 
+    it('prefers actor ids over matching emails', () => {
+      expect(
+        classifyOwnership({
+          currentUser: alice,
+          change: { ...bob, email: alice.email },
+        }),
+      ).toBe('different-user');
+    });
+    it('treats matching actor ids as same-user even when emails differ', () => {
+      expect(
+        classifyOwnership({
+          currentUser: alice,
+          change: { ...alice, email: 'alias@example.com' },
+        }),
+      ).toBe('same-user');
+    });
     it('returns same-user for matching emails', () => {
-      expect(classifyOwnership({ currentUser: alice, change: { ...alice } })).toBe('same-user');
+      expect(
+        classifyOwnership({
+          currentUser: { id: '', email: alice.email, name: 'Alice', hasId: false, hasEmail: true },
+          change: { id: '', email: alice.email, name: 'Alice', hasId: false, hasEmail: true },
+        }),
+      ).toBe('same-user');
     });
     it('returns different-user for distinct emails', () => {
-      expect(classifyOwnership({ currentUser: alice, change: bob })).toBe('different-user');
+      expect(
+        classifyOwnership({
+          currentUser: { id: '', email: alice.email, name: 'Alice', hasId: false, hasEmail: true },
+          change: { id: '', email: bob.email, name: 'Bob', hasId: false, hasEmail: true },
+        }),
+      ).toBe('different-user');
     });
     it('returns unknown-current-user when current email is missing', () => {
-      expect(classifyOwnership({ currentUser: { email: '', name: '', hasEmail: false }, change: bob })).toBe(
-        'unknown-current-user',
-      );
+      expect(
+        classifyOwnership({
+          currentUser: { id: '', email: '', name: '', hasId: false, hasEmail: false },
+          change: { id: '', email: bob.email, name: 'Bob', hasId: false, hasEmail: true },
+        }),
+      ).toBe('unknown-current-user');
     });
     it('returns unknown-change-author when change email is missing', () => {
-      expect(classifyOwnership({ currentUser: alice, change: { email: '', name: 'B', hasEmail: false } })).toBe(
-        'unknown-change-author',
-      );
+      expect(
+        classifyOwnership({
+          currentUser: { id: '', email: alice.email, name: 'Alice', hasId: false, hasEmail: true },
+          change: { id: '', email: '', name: 'B', hasId: false, hasEmail: false },
+        }),
+      ).toBe('unknown-change-author');
     });
     it('display-name-only never matches', () => {
       expect(
         classifyOwnership({
-          currentUser: { email: '', name: 'Alice', hasEmail: false },
-          change: { email: '', name: 'Alice', hasEmail: false },
+          currentUser: { id: '', email: '', name: 'Alice', hasId: false, hasEmail: false },
+          change: { id: '', email: '', name: 'Alice', hasId: false, hasEmail: false },
         }),
       ).toBe('unknown-current-user');
     });
@@ -97,6 +148,27 @@ describe('review-model/identity', () => {
       expect(isSameUserHighConfidence('unknown-current-user')).toBe(false);
       expect(isSameUserHighConfidence('unknown-change-author')).toBe(false);
       expect(isSameUserHighConfidence('conflicting')).toBe(false);
+    });
+    it('allows legacy anonymous refinement only when names match or are absent', () => {
+      expect(
+        matchesSameUserRefinement({
+          currentUser: { id: '', email: '', name: 'Alice', hasId: false, hasEmail: false },
+          change: { id: '', email: '', name: 'Alice', hasId: false, hasEmail: false },
+        }),
+      ).toBe(true);
+      expect(
+        matchesSameUserRefinement({
+          currentUser: { id: '', email: '', name: 'Alice', hasId: false, hasEmail: false },
+          change: {
+            id: '',
+            email: '',
+            name: '',
+            hasId: false,
+            hasEmail: false,
+            importedAuthor: 'Mallory (imported)',
+          },
+        }),
+      ).toBe(false);
     });
   });
 });

@@ -132,6 +132,45 @@ describe('TrackedChangeIndex — per-story cache', () => {
     });
   });
 
+  it('preserves overlap metadata on snapshots', () => {
+    const editor = makeEditor();
+    mocks.groupTrackedChanges.mockReturnValueOnce([
+      {
+        ...makeGroupedChange('parent-insert', 0, 5),
+        overlap: {
+          visualLayers: [
+            { id: 'stale-parent-id', rawId: 'parent-insert', type: 'insert', relationship: 'parent' },
+            { id: 'stale-child-id', rawId: 'child-delete', type: 'delete', relationship: 'child' },
+          ],
+          preferredContextTargetId: 'stale-child-id',
+          preferredContextTarget: {
+            id: 'stale-child-id',
+            rawId: 'child-delete',
+            type: 'delete',
+            relationship: 'child',
+          },
+        },
+      },
+      {
+        ...makeGroupedChange('child-delete', 1, 4),
+        hasInsert: false,
+        hasDelete: true,
+      },
+    ]);
+
+    const index = getTrackedChangeIndex(editor);
+    const snapshots = index.get({ kind: 'story', storyType: 'body' });
+
+    expect(snapshots[0]?.overlap).toEqual({
+      visualLayers: [
+        { id: 'canon-parent-insert', type: 'insert', relationship: 'parent' },
+        { id: 'canon-child-delete', type: 'delete', relationship: 'child' },
+      ],
+      preferredContextTargetId: 'canon-child-delete',
+      preferredContextTarget: { id: 'canon-child-delete', type: 'delete', relationship: 'child' },
+    });
+  });
+
   it('returns story-scoped anchor keys for footnote stories', () => {
     const editor = makeEditor();
     mocks.enumerateRevisionCapableStories.mockReturnValue([

@@ -43,6 +43,7 @@ import type {
   MathRun,
   TextRun,
   TrackedChangeKind,
+  TrackedChangeMeta,
   TrackedChangesMode,
   VectorShapeDrawing,
   VectorShapeStyle,
@@ -1026,6 +1027,13 @@ const TRACK_CHANGE_MODIFIER_CLASS: Record<TrackedChangeKind, Record<TrackedChang
 type TrackedChangesRenderConfig = {
   mode: TrackedChangesMode;
   enabled: boolean;
+};
+
+const getTrackedChangeLayers = (run: TextRun): TrackedChangeMeta[] => {
+  if (Array.isArray(run.trackedChanges) && run.trackedChanges.length > 0) {
+    return run.trackedChanges;
+  }
+  return run.trackedChange ? [run.trackedChange] : [];
 };
 
 /**
@@ -7076,23 +7084,28 @@ export class DomPainter {
     }
 
     const textRun = run as TextRun;
-    const meta = textRun.trackedChange;
-    if (!meta) {
+    const layers = getTrackedChangeLayers(textRun);
+    if (layers.length === 0) {
       return;
     }
+    const meta = textRun.trackedChange ?? layers[0];
 
-    const baseClass = TRACK_CHANGE_BASE_CLASS[meta.kind];
-    if (baseClass) {
-      elem.classList.add(baseClass);
-    }
+    layers.forEach((layer) => {
+      const baseClass = TRACK_CHANGE_BASE_CLASS[layer.kind];
+      if (baseClass) {
+        elem.classList.add(baseClass);
+      }
 
-    const modifier = TRACK_CHANGE_MODIFIER_CLASS[meta.kind]?.[config.mode];
-    if (modifier) {
-      elem.classList.add(modifier);
-    }
+      const modifier = TRACK_CHANGE_MODIFIER_CLASS[layer.kind]?.[config.mode];
+      if (modifier) {
+        elem.classList.add(modifier);
+      }
+    });
 
     elem.dataset.trackChangeId = meta.id;
     elem.dataset.trackChangeKind = meta.kind;
+    elem.dataset.trackChangeIds = layers.map((layer) => layer.id).join(',');
+    elem.dataset.trackChangeKinds = layers.map((layer) => layer.kind).join(',');
     elem.dataset.storyKey = meta.storyKey ?? 'body';
     if (meta.author) {
       elem.dataset.trackChangeAuthor = meta.author;
@@ -7896,19 +7909,23 @@ const deriveBlockVersion = (block: FlowBlock): string => {
 
         // Handle TextRun (kind is 'text' or undefined)
         const textRun = run as TextRun;
-        const trackedChangeVersion = textRun.trackedChange
-          ? [
-              textRun.trackedChange.kind ?? '',
-              textRun.trackedChange.id ?? '',
-              textRun.trackedChange.storyKey ?? '',
-              textRun.trackedChange.author ?? '',
-              textRun.trackedChange.authorEmail ?? '',
-              textRun.trackedChange.authorImage ?? '',
-              textRun.trackedChange.date ?? '',
-              textRun.trackedChange.before ? JSON.stringify(textRun.trackedChange.before) : '',
-              textRun.trackedChange.after ? JSON.stringify(textRun.trackedChange.after) : '',
-            ].join(':')
-          : '';
+        const trackedChangeVersion = getTrackedChangeLayers(textRun)
+          .map((trackedChange) =>
+            [
+              trackedChange.kind ?? '',
+              trackedChange.id ?? '',
+              trackedChange.storyKey ?? '',
+              trackedChange.overlapParentId ?? '',
+              trackedChange.relationship ?? '',
+              trackedChange.author ?? '',
+              trackedChange.authorEmail ?? '',
+              trackedChange.authorImage ?? '',
+              trackedChange.date ?? '',
+              trackedChange.before ? JSON.stringify(trackedChange.before) : '',
+              trackedChange.after ? JSON.stringify(trackedChange.after) : '',
+            ].join(':'),
+          )
+          .join('|');
         return [
           textRun.text ?? '',
           textRun.fontFamily,

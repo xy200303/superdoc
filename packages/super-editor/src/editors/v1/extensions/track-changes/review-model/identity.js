@@ -1,13 +1,12 @@
 // @ts-check
+import { normalizeActorEmail, normalizeActorId, normalizeActorName } from '@superdoc/common';
+
 /**
  * Identity helpers for the review graph.
  *
- * Same-user behavior requires high-confidence identity. A trusted author email
- * match on both the current editor user and the change author's stored email
- * is the only signal that returns `same-user`. Every other combination —
- * missing email on either side, only display-name match, imported author
- * strings without a trusted email, or mismatched email — returns a
- * different-user classification.
+ * Same-user behavior requires high-confidence identity. Actor ids are the
+ * canonical principal when both sides provide them. Legacy/imported content
+ * still falls back to trusted author-email matching when ids are absent.
  */
 
 /**
@@ -16,16 +15,29 @@
  * @returns {string}
  */
 export const normalizeEmail = (value) => {
-  if (typeof value !== 'string') return '';
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  return trimmed.toLowerCase();
+  return normalizeActorEmail(value);
+};
+
+/**
+ * Trim and lowercase a display-name value. Anything not a string normalizes to ''.
+ * @param {unknown} value
+ * @returns {string}
+ */
+export const normalizeName = (value) => {
+  return normalizeActorName(value);
+};
+
+const normalizeImportedAuthorName = (value) => {
+  const normalized = normalizeName(value).replace(/\s+\(imported\)$/, '');
+  return normalized === 'undefined' || normalized === 'null' ? '' : normalized;
 };
 
 /**
  * @typedef {Object} UserIdentity
+ * @property {string} id        normalized actor id, '' when unknown.
  * @property {string} email     normalized email, '' when unknown.
  * @property {string} name      display name (may be empty).
+ * @property {boolean} hasId    true when normalized id is non-empty.
  * @property {boolean} hasEmail true when normalized email is non-empty.
  * @property {string} [importedAuthor] imported author provenance, when present.
  */
@@ -35,14 +47,15 @@ export const normalizeEmail = (value) => {
  * Tolerates a missing editor / options / user so callers can pass a partial
  * editor (or a snapshot for tests).
  *
- * @param {{ options?: { user?: { name?: unknown, email?: unknown } } } | null | undefined} editor
+ * @param {{ options?: { user?: { id?: unknown, name?: unknown, email?: unknown } } } | null | undefined} editor
  * @returns {UserIdentity}
  */
 export const getCurrentUserIdentity = (editor) => {
   const user = editor?.options?.user ?? null;
+  const id = normalizeActorId(user?.id);
   const email = normalizeEmail(user?.email);
   const name = typeof user?.name === 'string' ? user.name : '';
-  return { email, name, hasEmail: email.length > 0 };
+  return { id, email, name, hasId: id.length > 0, hasEmail: email.length > 0 };
 };
 
 /**
@@ -53,15 +66,30 @@ export const getCurrentUserIdentity = (editor) => {
  * @returns {UserIdentity}
  */
 export const getChangeAuthorIdentity = (changeOrAttrs) => {
-  if (!changeOrAttrs) return { email: '', name: '', hasEmail: false };
+  if (!changeOrAttrs) return { id: '', email: '', name: '', hasId: false, hasEmail: false };
 
   // Accept either { attrs: {...} }, { mark: { attrs } }, or a flat attrs map.
   const attrs = changeOrAttrs.attrs ?? changeOrAttrs.mark?.attrs ?? changeOrAttrs;
 
+  const id = normalizeActorId(attrs?.authorId);
   const email = normalizeEmail(attrs?.authorEmail);
   const name = typeof attrs?.author === 'string' ? attrs.author : '';
   const importedAuthor = typeof attrs?.importedAuthor === 'string' ? attrs.importedAuthor : '';
-  return { email, name, hasEmail: email.length > 0, importedAuthor };
+  /** @type {UserIdentity} */
+  const identity = { id, email, name, hasId: id.length > 0, hasEmail: email.length > 0 };
+  if (importedAuthor) identity.importedAuthor = importedAuthor;
+  return identity;
+};
+
+const hasImportedAuthorConflict = ({ currentUser, change }) => {
+  const importedAuthorName = normalizeImportedAuthorName(change?.importedAuthor);
+  const currentName = normalizeName(currentUser?.name);
+  const changeName = normalizeName(change?.name);
+
+  if (!importedAuthorName || !currentName || !changeName) return false;
+  if (importedAuthorName === currentName) return false;
+  if (changeName === currentName) return false;
+  return true;
 };
 
 /**
@@ -77,8 +105,9 @@ export const getChangeAuthorIdentity = (changeOrAttrs) => {
 /**
  * Classify ownership between the current editor user and a change author.
  *
- * Rules (per plan):
- * - normalized authorEmail match is high-confidence => `same-user`.
+ * Rules:
+ * - when both sides provide actor ids, id match is authoritative.
+ * - otherwise, normalized authorEmail match is high-confidence => `same-user`.
  * - display name alone is never same-user.
  * - missing current user email is `unknown-current-user`.
  * - missing change author email is `unknown-change-author`.
@@ -94,28 +123,21 @@ export const getChangeAuthorIdentity = (changeOrAttrs) => {
  * @returns {OwnershipClassification}
  */
 export const classifyOwnership = ({ currentUser, change }) => {
-  const cur = currentUser ?? { email: '', name: '', hasEmail: false };
-  const auth = change ?? { email: '', name: '', hasEmail: false };
+  const cur = currentUser ?? { id: '', email: '', name: '', hasId: false, hasEmail: false };
+  const auth = change ?? { id: '', email: '', name: '', hasId: false, hasEmail: false };
+
+  if (hasImportedAuthorConflict({ currentUser: cur, change: auth })) {
+    return 'conflicting';
+  }
+
+  if (cur.hasId && auth.hasId) {
+    return cur.id === auth.id ? 'same-user' : 'different-user';
+  }
 
   if (!cur.hasEmail) return 'unknown-current-user';
   if (!auth.hasEmail) return 'unknown-change-author';
 
   if (cur.email === auth.email) {
-    // Same email but obviously different display name pattern is still
-    // 'same-user' — display name is not a security signal. Only flag
-    // `conflicting` if the change carries an explicit `importedAuthor`
-    // mismatch with a different display, which is an import-provenance
-    // signal that should NOT be treated as ordinary same-user refinement.
-    if (
-      typeof change?.importedAuthor === 'string' &&
-      change.importedAuthor.trim() &&
-      cur.name &&
-      change.importedAuthor.trim().toLowerCase() !== cur.name.trim().toLowerCase() &&
-      change.name &&
-      change.name !== cur.name
-    ) {
-      return 'conflicting';
-    }
     return 'same-user';
   }
 
@@ -130,3 +152,55 @@ export const classifyOwnership = ({ currentUser, change }) => {
  * @returns {boolean}
  */
 export const isSameUserHighConfidence = (classification) => classification === 'same-user';
+
+/**
+ * Refinement is slightly more permissive than review ownership. When neither
+ * side carries actor ids or emails, legacy anonymous typing still coalesces
+ * into the same logical change only when the stored no-email author is
+ * actually unattributed, or when display names match.
+ *
+ * @param {{ currentUser?: UserIdentity, change?: UserIdentity }} input
+ * @returns {boolean}
+ */
+export const matchesSameUserRefinement = ({ currentUser, change }) => {
+  const cur = currentUser ?? { id: '', email: '', name: '', hasId: false, hasEmail: false };
+  const auth = change ?? { id: '', email: '', name: '', hasId: false, hasEmail: false };
+  const classification = classifyOwnership({ currentUser: cur, change: auth });
+  if (isSameUserHighConfidence(classification)) return true;
+
+  if (!cur.hasId && !auth.hasId && !cur.hasEmail && !auth.hasEmail) {
+    const changeName = normalizeName(auth.name) || normalizeImportedAuthorName(auth.importedAuthor);
+    if (!changeName) return true;
+    const currentName = normalizeName(cur.name);
+    return Boolean(currentName && currentName === changeName);
+  }
+
+  return false;
+};
+
+/**
+ * Imported/no-email insertions predate reliable authorEmail metadata. They may
+ * collapse on delete only when the mark is truly unattributed, or when its
+ * no-email display name matches the current user. A named different author
+ * with no email is still different-user review state and must be protected.
+ *
+ * @param {{ currentUser?: { id?: unknown, name?: unknown, email?: unknown }, insertionAttrs?: Record<string, unknown> | null | undefined }} input
+ * @returns {boolean}
+ */
+export const shouldCollapseNoEmailInsertion = ({ currentUser, insertionAttrs }) => {
+  const authorId = normalizeActorId(insertionAttrs?.authorId);
+  const currentId = normalizeActorId(currentUser?.id);
+  if (authorId || currentId) {
+    return Boolean(authorId && currentId && authorId === currentId);
+  }
+
+  const authorEmail = normalizeEmail(insertionAttrs?.authorEmail);
+  if (authorEmail) return false;
+
+  const authorName =
+    normalizeName(insertionAttrs?.author) || normalizeImportedAuthorName(insertionAttrs?.importedAuthor);
+  if (!authorName) return true;
+
+  const currentName = normalizeName(currentUser?.name);
+  return Boolean(currentName && currentName === authorName);
+};

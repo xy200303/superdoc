@@ -8,6 +8,7 @@ import type {
   StoryLocator,
   TrackedChangeAddress,
   TrackChangeType,
+  TrackChangeOverlapInfo,
   TrackChangeWordRevisionIds,
 } from '@superdoc/document-api';
 import type { TrackedChangeRuntimeRef } from '../helpers/tracked-change-runtime-ref.js';
@@ -33,6 +34,8 @@ export interface TrackedChangeSnapshot {
   excerpt?: string;
   /** Raw imported Word revision IDs, if present. */
   wordRevisionIds?: TrackChangeWordRevisionIds;
+  /** Overlap metadata for nested tracked changes that share the same text range. */
+  overlap?: TrackChangeOverlapInfo;
   /** Human-readable label for sidebar cards ("Footer · Section 3", "Footnote 12"). */
   storyLabel: string;
   /** Coarse classifier for UI decisions (icon, label). */

@@ -122,6 +122,8 @@ export interface FontConfig {
  * User information for collaboration
  */
 export interface User {
+  /** Stable actor id for authorship and ownership checks. */
+  id?: string | null;
   /** The user's name */
   name?: string;
 

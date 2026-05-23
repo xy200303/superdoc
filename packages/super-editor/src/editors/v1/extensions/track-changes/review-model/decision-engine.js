@@ -331,7 +331,12 @@ const runPermissionPreflight = ({ editor, decision, selections }) => {
     const change = selection.change;
     const classification = classifyOwnership({
       currentUser: currentIdentity,
-      change: getChangeAuthorIdentity(change.author ? { author: change.author, authorEmail: change.authorEmail } : {}),
+      change: getChangeAuthorIdentity({
+        author: change.author,
+        authorId: change.authorId,
+        authorEmail: change.authorEmail,
+        importedAuthor: change.importedAuthor,
+      }),
     });
     const isOwn = isSameUserHighConfidence(classification);
     const permission =
@@ -344,7 +349,7 @@ const runPermissionPreflight = ({ editor, decision, selections }) => {
       trackedChange: {
         id: change.id,
         type: change.type,
-        attrs: { author: change.author, authorEmail: change.authorEmail, date: change.date },
+        attrs: { author: change.author, authorId: change.authorId, authorEmail: change.authorEmail, date: change.date },
         from: selection.ranges[0]?.from ?? 0,
         to: selection.ranges[selection.ranges.length - 1]?.to ?? 0,
         segments: change.segments.map((s) => ({ from: s.from, to: s.to })),
@@ -515,16 +520,12 @@ const planInsertionDecision = ({ ops, change, selection, decision, removedRanges
     // Accept insertion: keep content, remove the trackInsert mark.
     const ranges = isFull ? change.insertedSegments.map((s) => ({ from: s.from, to: s.to })) : selection.ranges;
     for (const range of ranges) {
-      const segment =
-        change.insertedSegments.find((s) => s.from <= range.from && s.to >= range.to) ?? change.insertedSegments[0];
-      if (!segment) continue;
-      ops.push({
-        kind: 'removeMark',
-        from: range.from,
-        to: range.to,
+      pushRemoveMarkOpsForRange({
+        ops,
+        segments: change.insertedSegments,
+        range,
         changeId: change.id,
         side: SegmentSide.Inserted,
-        mark: segment.mark,
       });
     }
     if (isFull) retired.add(change.id);
@@ -566,16 +567,12 @@ const planDeletionDecision = ({ ops, change, selection, decision, removedRanges,
   // Reject deletion: remove the trackDelete mark; content stays as live.
   const ranges = isFull ? change.deletedSegments.map((s) => ({ from: s.from, to: s.to })) : selection.ranges;
   for (const range of ranges) {
-    const segment =
-      change.deletedSegments.find((s) => s.from <= range.from && s.to >= range.to) ?? change.deletedSegments[0];
-    if (!segment) continue;
-    ops.push({
-      kind: 'removeMark',
-      from: range.from,
-      to: range.to,
+    pushRemoveMarkOpsForRange({
+      ops,
+      segments: change.deletedSegments,
+      range,
       changeId: change.id,
       side: SegmentSide.Deleted,
-      mark: segment.mark,
     });
   }
   if (isFull) retired.add(change.id);
@@ -596,13 +593,11 @@ const planReplacementDecision = ({ ops, change, decision, removedRanges, retired
       removedRanges.push({ from: seg.from, to: seg.to, cause: `accept-replacement-deleted:${change.id}` });
     }
     for (const seg of inserted) {
-      ops.push({
-        kind: 'removeMark',
-        from: seg.from,
-        to: seg.to,
+      pushRemoveMarkOpsForSegment({
+        ops,
+        segment: seg,
         changeId: change.id,
         side: SegmentSide.Inserted,
-        mark: seg.mark,
       });
     }
   } else {
@@ -612,13 +607,11 @@ const planReplacementDecision = ({ ops, change, decision, removedRanges, retired
       removedRanges.push({ from: seg.from, to: seg.to, cause: `reject-replacement-inserted:${change.id}` });
     }
     for (const seg of deleted) {
-      ops.push({
-        kind: 'removeMark',
-        from: seg.from,
-        to: seg.to,
+      pushRemoveMarkOpsForSegment({
+        ops,
+        segment: seg,
         changeId: change.id,
         side: SegmentSide.Deleted,
-        mark: seg.mark,
       });
     }
   }
@@ -629,25 +622,25 @@ const planReplacementDecision = ({ ops, change, decision, removedRanges, retired
 const planFormattingDecision = ({ ops, change, decision, retired }) => {
   for (const seg of change.formattingSegments) {
     if (decision === 'accept') {
-      ops.push({
-        kind: 'removeMark',
-        from: seg.from,
-        to: seg.to,
+      pushRemoveMarkOpsForSegment({
+        ops,
+        segment: seg,
         changeId: change.id,
         side: SegmentSide.Formatting,
-        mark: seg.mark,
       });
     } else {
-      ops.push({
-        kind: 'restoreFormat',
-        from: seg.from,
-        to: seg.to,
-        changeId: change.id,
-        side: SegmentSide.Formatting,
-        mark: seg.mark,
-        beforeMarks: seg.mark.attrs?.before ?? [],
-        afterMarks: seg.mark.attrs?.after ?? [],
-      });
+      for (const run of getSegmentMarkRuns(seg)) {
+        ops.push({
+          kind: 'restoreFormat',
+          from: run.from,
+          to: run.to,
+          changeId: change.id,
+          side: SegmentSide.Formatting,
+          mark: run.mark,
+          beforeMarks: run.mark.attrs?.before ?? [],
+          afterMarks: run.mark.attrs?.after ?? [],
+        });
+      }
     }
   }
   retired.add(change.id);
@@ -666,7 +659,12 @@ const planPartialTextDecision = ({ ops, change, selection, decision, removedRang
   let successorOrdinal = 0;
 
   for (const segment of segments) {
-    ops.push({ kind: 'removeMark', from: segment.from, to: segment.to, changeId: change.id, side, mark: segment.mark });
+    pushRemoveMarkOpsForSegment({
+      ops,
+      segment,
+      changeId: change.id,
+      side,
+    });
 
     const pieces = subtractRanges({ from: segment.from, to: segment.to }, selectedRanges);
     for (const piece of pieces) {
@@ -706,6 +704,40 @@ const planPartialTextDecision = ({ ops, change, selection, decision, removedRang
 
   retired.add(change.id);
   return { ok: true, createdChangeIds: successorRanges.map((entry) => entry.id) };
+};
+
+const pushRemoveMarkOpsForRange = ({ ops, segments, range, changeId, side }) => {
+  for (const segment of segments) {
+    if (segment.to <= range.from || segment.from >= range.to) continue;
+    pushRemoveMarkOpsForSegment({
+      ops,
+      segment,
+      changeId,
+      side,
+      from: Math.max(segment.from, range.from),
+      to: Math.min(segment.to, range.to),
+    });
+  }
+};
+
+const pushRemoveMarkOpsForSegment = ({ ops, segment, changeId, side, from = segment.from, to = segment.to }) => {
+  for (const run of getSegmentMarkRuns(segment)) {
+    const clippedFrom = Math.max(from, run.from);
+    const clippedTo = Math.min(to, run.to);
+    if (clippedFrom >= clippedTo) continue;
+    ops.push({
+      kind: 'removeMark',
+      from: clippedFrom,
+      to: clippedTo,
+      changeId,
+      side,
+      mark: run.mark,
+    });
+  }
+};
+
+const getSegmentMarkRuns = (segment) => {
+  return segment.markRuns?.length ? segment.markRuns : [{ from: segment.from, to: segment.to, mark: segment.mark }];
 };
 
 const mergeRanges = (ranges) => {
@@ -874,18 +906,33 @@ const collectCreatedChangeIds = (plan) => {
  * @param {Object} input
  * @param {DecisionResult} input.result
  * @param {object} input.editor
- * @returns {Array<{ type: 'trackedChange', event: 'resolve'|'update', changeId: string, resolvedByEmail?: string, resolvedByName?: string }>}
+ * @returns {Array<{ type: 'trackedChange', event: 'resolve'|'update', changeId: string, resolvedById?: string, resolvedByEmail?: string, resolvedByName?: string }>}
  */
 export const buildDecisionBubbleEvents = ({ result, editor }) => {
+  const resolvedById = editor?.options?.user?.id;
   const resolvedByEmail = editor?.options?.user?.email;
   const resolvedByName = editor?.options?.user?.name;
-  /** @type {Array<{ type: 'trackedChange', event: 'resolve'|'update', changeId: string, resolvedByEmail?: string, resolvedByName?: string }>} */
+  /** @type {Array<{ type: 'trackedChange', event: 'resolve'|'update', changeId: string, resolvedById?: string, resolvedByEmail?: string, resolvedByName?: string }>} */
   const events = [];
   for (const entry of result.receipt.removedChangeIds) {
-    events.push({ type: 'trackedChange', event: 'resolve', changeId: entry.id, resolvedByEmail, resolvedByName });
+    events.push({
+      type: 'trackedChange',
+      event: 'resolve',
+      changeId: entry.id,
+      resolvedById,
+      resolvedByEmail,
+      resolvedByName,
+    });
   }
   for (const child of result.receipt.affectedChildren) {
-    events.push({ type: 'trackedChange', event: 'resolve', changeId: child.changeId, resolvedByEmail, resolvedByName });
+    events.push({
+      type: 'trackedChange',
+      event: 'resolve',
+      changeId: child.changeId,
+      resolvedById,
+      resolvedByEmail,
+      resolvedByName,
+    });
   }
   return events;
 };

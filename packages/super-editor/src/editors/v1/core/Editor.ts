@@ -34,7 +34,11 @@ import {
 import { createDocument } from './helpers/createDocument.js';
 import { isActive } from './helpers/isActive.js';
 import { trackedTransaction } from '@extensions/track-changes/trackChangesHelpers/trackedTransaction.js';
-import { createWordIdAllocator, isDecimalWordId } from '@extensions/track-changes/review-model/word-id-allocator.js';
+import {
+  createWordIdAllocator,
+  isDecimalWordId,
+  TRACKED_CHANGE_SOURCE_ID_MAP_PROPERTY,
+} from '@extensions/track-changes/review-model/word-id-allocator.js';
 import { TrackDeleteMarkName, TrackFormatMarkName, TrackInsertMarkName } from '@extensions/track-changes/constants.js';
 import { TrackChangesBasePluginKey } from '@extensions/track-changes/plugins/index.js';
 import { CommentsPluginKey } from '@extensions/comment/comments-plugin.js';
@@ -96,7 +100,9 @@ import { resolveMainBodyEditor } from '../document-api-adapters/helpers/word-sta
 import { commitLiveStorySessionRuntimes } from '../document-api-adapters/story-runtime/live-story-session-runtime-registry.js';
 
 type ConverterWithInternalWordIdAllocator = EditorConverterSurface & {
-  wordIdAllocator?: unknown;
+  wordIdAllocator?: {
+    getSourceIdMap?: () => Record<string, Record<string, string>>;
+  } | null;
 };
 
 declare const __APP_VERSION__: string | undefined;
@@ -3414,6 +3420,39 @@ export class Editor extends EventEmitter<EditorEventMap> {
     (this.converter as ConverterWithInternalWordIdAllocator).wordIdAllocator = allocator;
   }
 
+  #persistTrackedChangeSourceIdMap(): void {
+    if (!this.converter) return;
+
+    const allocator = (this.converter as ConverterWithInternalWordIdAllocator).wordIdAllocator;
+    const sourceIdMap = allocator?.getSourceIdMap?.() ?? {};
+    if (Object.keys(sourceIdMap).length === 0 && !this.#hasTrackedChangeSourceIdMapProperty()) return;
+
+    const payload = JSON.stringify({ version: 1, parts: sourceIdMap });
+    SuperConverter.setStoredCustomProperty(
+      this.converter.convertedXml,
+      TRACKED_CHANGE_SOURCE_ID_MAP_PROPERTY,
+      payload,
+      false,
+    );
+  }
+
+  #hasTrackedChangeSourceIdMapProperty(): boolean {
+    const customXml = this.converter?.convertedXml?.['docProps/custom.xml'];
+    const properties = customXml?.elements?.find((node: { name?: string }) => {
+      const name = node?.name;
+      return name === 'Properties' || name?.endsWith(':Properties');
+    });
+    return Boolean(
+      properties?.elements?.some((node: { name?: string; attributes?: { name?: string } }) => {
+        const name = node?.name;
+        return (
+          (name === 'property' || name?.endsWith(':property')) &&
+          node.attributes?.name === TRACKED_CHANGE_SOURCE_ID_MAP_PROPERTY
+        );
+      }),
+    );
+  }
+
   /**
    * Export the editor document to DOCX.
    *
@@ -3492,6 +3531,8 @@ export class Editor extends EventEmitter<EditorEventMap> {
       this.#validateDocumentExport();
 
       if (exportXmlOnly || exportJsonOnly) return documentXml;
+
+      this.#persistTrackedChangeSourceIdMap();
 
       const customXml = this.converter.schemaToXml(this.converter.convertedXml['docProps/custom.xml'].elements[0]);
       const styles = this.converter.schemaToXml(this.converter.convertedXml['word/styles.xml'].elements[0]);

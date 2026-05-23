@@ -83,6 +83,20 @@ describe('createWordIdAllocator', () => {
     expect(alloc.allocate({ partPath: 'word/document.xml', sourceId: '-3', logicalId: 'y' })).toBe('2');
   });
 
+  it('records non-decimal sourceId rewrites for reopen import', () => {
+    const alloc = createWordIdAllocator();
+
+    expect(alloc.allocate({ partPath: 'word/document.xml', sourceId: 'uuid-a', logicalId: 'a' })).toBe('1');
+    expect(alloc.allocate({ partPath: 'word/document.xml', sourceId: '9', logicalId: 'word-import' })).toBe('9');
+    expect(alloc.allocate({ partPath: 'word/header1.xml', sourceId: 'uuid-h', logicalId: 'h' })).toBe('1');
+    expect(alloc.allocate({ partPath: 'word/document.xml', sourceId: 'uuid-a', logicalId: 'a' })).toBe('1');
+
+    expect(alloc.getSourceIdMap()).toEqual({
+      'word/document.xml': { 1: 'uuid-a' },
+      'word/header1.xml': { 1: 'uuid-h' },
+    });
+  });
+
   it('handles missing partPath by routing to document.xml', () => {
     const alloc = createWordIdAllocator();
     expect(alloc.allocate({ partPath: '', logicalId: 'x' })).toBe('1');

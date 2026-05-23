@@ -7,6 +7,7 @@ const contextsByConverter = new WeakMap();
  * @typedef {{
  *   trackedChangeIdMapsByPart?: Map<string, Map<string, string>>,
  *   trackedChangeIdMap?: Map<string, string>,
+ *   trackedChangeSourceIdMapByPart?: Map<string, Map<string, string>>,
  *   trackedChangesOptions?: { replacements?: 'paired' | 'independent' },
  * }} ConverterLike
  *
@@ -48,16 +49,31 @@ export function getTrackedChangeIdMapForPart(params = {}, partPath = resolveTrac
 
 /**
  * @param {ImportTrackingParams} [params]
+ * @param {string} [partPath]
+ * @param {string} [wordId]
+ */
+function getTrackedChangeSourceIdForPart(params = {}, partPath = resolveTrackedChangePartPath(params), wordId = '') {
+  const converter = params.converter;
+  if (!converter || typeof converter !== 'object') return null;
+
+  const sourceIdsByPart = converter.trackedChangeSourceIdMapByPart;
+  const restored = sourceIdsByPart?.get?.(partPath)?.get?.(wordId);
+  return typeof restored === 'string' && restored.length > 0 ? restored : null;
+}
+
+/**
+ * @param {ImportTrackingParams} [params]
  * @param {string} sourceId
  * @returns {{ partPath: string, sourceId: string, logicalId: string }}
  */
 export function resolveTrackedChangeImportIds(params = {}, sourceId = '') {
   const partPath = resolveTrackedChangePartPath(params);
   const id = typeof sourceId === 'string' ? sourceId : String(sourceId || '');
+  const restoredSourceId = getTrackedChangeSourceIdForPart(params, partPath, id) ?? id;
   const trackedChangeIdMap = getTrackedChangeIdMapForPart(params, partPath);
   return {
     partPath,
-    sourceId: id,
+    sourceId: restoredSourceId,
     logicalId: id && trackedChangeIdMap?.has(id) ? (trackedChangeIdMap.get(id) ?? id) : id,
   };
 }

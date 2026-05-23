@@ -25,6 +25,7 @@
  *   reserveAll: (entries: Iterable<{ partPath: string, sourceId: string | number | null | undefined }>) => void,
  *   allocate: (input: { partPath: string, sourceId?: string | number | null, logicalId?: string | null }) => string,
  *   isDecimal: (value: unknown) => boolean,
+ *   getSourceIdMap: () => Record<string, Record<string, string>>,
  *   __snapshot: () => Record<string, { reservedDecimal: number[], nextDecimal: number }>,
  * }} WordIdAllocator
  *
@@ -32,10 +33,13 @@
  *   reservedDecimal: Set<number>,
  *   nextDecimal: number,
  *   assignedByLogicalId: Map<string, number>,
+ *   sourceIdByWordId: Map<string, string>,
  * }} PartWordIdState
  */
 
 const DECIMAL = /^\d+$/;
+
+export const TRACKED_CHANGE_SOURCE_ID_MAP_PROPERTY = 'SuperdocTrackedChangeSourceIds';
 
 /**
  * Returns true when the given value, after coercion to a trimmed string, is
@@ -70,10 +74,23 @@ export function createWordIdAllocator() {
         reservedDecimal: new Set(),
         nextDecimal: 1,
         assignedByLogicalId: new Map(),
+        sourceIdByWordId: new Map(),
       };
       stateByPart.set(key, state);
     }
     return state;
+  };
+
+  /**
+   * @param {PartWordIdState} state
+   * @param {string | number | null | undefined} sourceId
+   * @param {number} wordId
+   */
+  const recordSourceIdRewrite = (state, sourceId, wordId) => {
+    if (sourceId == null) return;
+    const source = String(sourceId).trim();
+    if (!source || isDecimalWordId(source)) return;
+    state.sourceIdByWordId.set(String(wordId), source);
   };
 
   /** @type {WordIdAllocator['reserve']} */
@@ -113,7 +130,11 @@ export function createWordIdAllocator() {
     // so both sides emit the same `w:id` on export, matching Word's pairing
     // convention.
     if (logicalId && state.assignedByLogicalId.has(logicalId)) {
-      return String(state.assignedByLogicalId.get(logicalId));
+      const assigned = state.assignedByLogicalId.get(logicalId);
+      if (typeof assigned === 'number') {
+        recordSourceIdRewrite(state, sourceId, assigned);
+        return String(assigned);
+      }
     }
 
     let n = state.nextDecimal;
@@ -121,7 +142,18 @@ export function createWordIdAllocator() {
     state.reservedDecimal.add(n);
     state.nextDecimal = n + 1;
     if (logicalId) state.assignedByLogicalId.set(logicalId, n);
+    recordSourceIdRewrite(state, sourceId, n);
     return String(n);
+  };
+
+  const getSourceIdMap = () => {
+    /** @type {Record<string, Record<string, string>>} */
+    const out = {};
+    for (const [part, state] of stateByPart.entries()) {
+      if (state.sourceIdByWordId.size === 0) continue;
+      out[part] = Object.fromEntries([...state.sourceIdByWordId.entries()].sort(([a], [b]) => a.localeCompare(b)));
+    }
+    return out;
   };
 
   const __snapshot = () => {
@@ -141,6 +173,7 @@ export function createWordIdAllocator() {
     reserveAll,
     allocate,
     isDecimal: isDecimalWordId,
+    getSourceIdMap,
     __snapshot,
   };
 }

@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { markRaw, toRaw } from 'vue';
 import { HocuspocusProviderWebsocket } from '@hocuspocus/provider';
 
-import { DOCX, PDF, HTML } from '@superdoc/common';
+import { DOCX, PDF, HTML, getActorIdentityKey, normalizeActorEmail } from '@superdoc/common';
 import { SuperToolbar, createZip, seedEditorStateToYDoc, onCollaborationProviderSynced } from '@superdoc/super-editor';
 import { SuperComments } from '../components/CommentsLayer/commentsList/super-comments-list.js';
 import { createSuperdocVueApp } from './create-app.js';
@@ -23,6 +23,7 @@ import { createDeprecatedEditorProxy } from '../helpers/deprecation.js';
 import { normalizeTrackChangesConfig } from './helpers/normalize-track-changes-config.js';
 
 const DEFAULT_USER = Object.freeze({
+  id: null,
   name: 'Default SuperDoc user',
   email: null,
 });
@@ -1004,7 +1005,7 @@ export class SuperDoc extends EventEmitter<SuperDocEventMap> {
     if (!user || user.color) return;
 
     const palette = this.colors.length > 0 ? this.colors : DEFAULT_AWARENESS_PALETTE;
-    const userKey = user.email || user.name || '';
+    const userKey = user.id || user.email || user.name || '';
     let hash = 5381;
     for (let i = 0; i < userKey.length; i++) {
       hash = ((hash << 5) + hash) ^ userKey.charCodeAt(i);
@@ -1387,19 +1388,30 @@ export class SuperDoc extends EventEmitter<SuperDocEventMap> {
    */
   addSharedUser(user: User) {
     this.#requireReady('addSharedUser');
-    if (this.users.some((u) => u.email === user.email)) return;
+    const userKey = getActorIdentityKey({ actor: user });
+    if (userKey && this.users.some((u) => getActorIdentityKey({ actor: u }) === userKey)) return;
     this.users.push(user);
   }
 
   /**
    * Remove a user from the shared users list. Requires the instance
-   * to be ready for the same reason as `addSharedUser`.
+   * to be ready for the same reason as `addSharedUser`. Accepts
+   * either a user-like object or a legacy email string.
    *
-   * @param {String} email The email of the user to remove
+   * @param {User | string} userOrEmail The user or email of the user to remove
    */
-  removeSharedUser(email: string) {
+  removeSharedUser(userOrEmail: User | string) {
     this.#requireReady('removeSharedUser');
-    this.users = this.users.filter((u) => u.email !== email);
+    const legacyEmail = typeof userOrEmail === 'string' ? normalizeActorEmail(userOrEmail) : '';
+    const targetKey =
+      typeof userOrEmail === 'string' ? `email:${legacyEmail}` : getActorIdentityKey({ actor: userOrEmail });
+
+    this.users = this.users.filter((u) => {
+      const existingKey = getActorIdentityKey({ actor: u });
+      if (targetKey) return existingKey !== targetKey;
+      if (legacyEmail) return normalizeActorEmail(u.email) !== legacyEmail;
+      return true;
+    });
   }
 
   /**

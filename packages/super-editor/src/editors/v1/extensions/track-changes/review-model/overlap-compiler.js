@@ -20,7 +20,7 @@
  */
 
 import { Slice, Fragment } from 'prosemirror-model';
-import { ReplaceStep } from 'prosemirror-transform';
+import { ReplaceStep, Mapping } from 'prosemirror-transform';
 import { v4 as uuidv4 } from 'uuid';
 import { TrackInsertMarkName, TrackDeleteMarkName, TrackFormatMarkName, TrackedFormatMarkNames } from '../constants.js';
 import { buildReviewGraph, CanonicalChangeType, SegmentSide } from './review-graph.js';
@@ -30,7 +30,20 @@ import {
   getCurrentUserIdentity,
   getChangeAuthorIdentity,
   isSameUserHighConfidence,
+  matchesSameUserRefinement,
+  shouldCollapseNoEmailInsertion,
 } from './identity.js';
+import { findMarkPosition } from '../trackChangesHelpers/documentHelpers.js';
+import { markInsertion } from '../trackChangesHelpers/markInsertion.js';
+import {
+  createMarkSnapshot,
+  getTypeName,
+  hasMatchingMark,
+  isTrackFormatNoOp,
+  markSnapshotMatchesStepMark,
+  upsertMarkSnapshotByType,
+} from '../trackChangesHelpers/markSnapshotHelpers.js';
+import { getLiveInlineMarksInRange } from '../trackChangesHelpers/getLiveInlineMarksInRange.js';
 
 /**
  * @typedef {import('./edit-intent.js').TrackedEditIntent} TrackedEditIntent
@@ -62,11 +75,17 @@ import {
  * @property {Array<{ from: string, to: string }>} remappedChangeIds
  * @property {SelectionHint} [selection]
  * @property {GraphDiagnostic[]} [diagnostics]
- * @property {import('prosemirror-model').Mark} [insertedMark]
+ * @property {import('prosemirror-model').Mark | null} [insertedMark]
+ * @property {import('prosemirror-model').Mark | null} [deletionMark]
  * @property {import('prosemirror-model').Mark[]} [deletionMarks]
  * @property {import('prosemirror-model').Mark[]} [formatMarks]
  * @property {number} [insertedFrom]
  * @property {number} [insertedTo]
+ * @property {number} [deletedFrom]
+ * @property {number} [deletedTo]
+ * @property {import('prosemirror-model').Node[]} [insertedNodes]
+ * @property {import('prosemirror-model').Node[]} [deletionNodes]
+ * @property {import('prosemirror-transform').ReplaceStep | null} [insertedStep]
  */
 
 /**
@@ -188,6 +207,28 @@ const classifySegment = (ctx, segment) => {
   return isSameUserHighConfidence(classification) ? 'same-user' : 'different-user';
 };
 
+/**
+ * Permissive same-user check for refinement (extending the current user's
+ * own contiguous edit). Differs from the high-confidence `classifySegment`
+ * gate used for overlap parent decisions: refinement is allowed when the
+ * stored authorEmail matches the current user's normalized email — including
+ * when both sides have no email at all (default unidentified user typing).
+ *
+ * Permission ownership and overlap parent decisions still require the
+ * high-confidence `classifySegment` path; this helper is only for "is this
+ * the same logical author for the purpose of coalescing contiguous edits".
+ *
+ * @param {*} ctx
+ * @param {*} segment
+ * @returns {boolean}
+ */
+const isSameUserForRefinement = (ctx, segment) => {
+  return matchesSameUserRefinement({
+    currentUser: ctx.currentIdentity,
+    change: getChangeAuthorIdentity(segment?.attrs ?? {}),
+  });
+};
+
 const findSegmentAt = (ctx, pos) => {
   // Prefer the segment that covers `pos` strictly (pos in [from, to)). When
   // `pos` sits exactly at the right edge of a segment, also consider it as a
@@ -211,6 +252,7 @@ const makeInsertMark = (ctx, { id, overlapParentId = '', replacementGroupId = ''
   const attrs = {
     id,
     author: ctx.intent.user.name || '',
+    authorId: ctx.intent.user.id || '',
     authorEmail: ctx.intent.user.email || '',
     authorImage: ctx.intent.user.image || '',
     date: ctx.intent.date,
@@ -234,6 +276,7 @@ const makeDeleteMark = (ctx, { id, overlapParentId = '', replacementGroupId = ''
   const attrs = {
     id,
     author: ctx.intent.user.name || '',
+    authorId: ctx.intent.user.id || '',
     authorEmail: ctx.intent.user.email || '',
     authorImage: ctx.intent.user.image || '',
     date: ctx.intent.date,
@@ -309,14 +352,18 @@ const compileTextInsert = (ctx, intent) => {
     !overlapParent && containing && (containing.to === at || containing.from === at) ? containing : null;
 
   // Same-user refinement targets: own insertion that strictly contains `at`,
-  // OR an own-insertion edge we are adjacent to. Adjacent same-user own
-  // insertion still refines the same id (extend the run).
+  // OR an own-insertion edge we are adjacent to. Refinement uses the
+  // permissive `isSameUserForRefinement` check so contiguous typing by the
+  // default unidentified user (no email) still coalesces into one id —
+  // matching the legacy `findTrackedMarkBetween({ authorEmail: '' })`
+  // behavior. Permission and overlap-parent decisions still go through the
+  // high-confidence `classifySegment` gate.
   const refinementTarget =
-    overlapParent && overlapParent.side === SegmentSide.Inserted && classifySegment(ctx, overlapParent) === 'same-user'
+    overlapParent && overlapParent.side === SegmentSide.Inserted && isSameUserForRefinement(ctx, overlapParent)
       ? overlapParent
       : boundaryAdjacent &&
           boundaryAdjacent.side === SegmentSide.Inserted &&
-          classifySegment(ctx, boundaryAdjacent) === 'same-user'
+          isSameUserForRefinement(ctx, boundaryAdjacent)
         ? boundaryAdjacent
         : null;
 
@@ -379,6 +426,12 @@ const applyInsert = (ctx, at, slice, insertMark, changeId, { update, create }) =
   if (create) ctx.createdChangeIds.push(changeId);
   else if (update) ctx.updatedChangeIds.push(changeId);
 
+  /** @type {Array<import('prosemirror-model').Node>} */
+  const insertedNodes = [];
+  ctx.tr.doc.nodesBetween(insertedFrom, insertedTo, (node) => {
+    if (node.isInline) insertedNodes.push(node);
+  });
+
   return {
     ok: true,
     tr: ctx.tr,
@@ -390,6 +443,7 @@ const applyInsert = (ctx, at, slice, insertMark, changeId, { update, create }) =
     insertedMark: insertMark,
     insertedFrom,
     insertedTo,
+    insertedNodes,
   };
 };
 
@@ -438,7 +492,9 @@ const compileTextDelete = (ctx, intent) => {
     removedChangeIds: ctx.removedChangeIds,
     remappedChangeIds: ctx.remappedChangeIds,
     selection: { kind: 'near', pos: intent.from, bias: -1 },
+    deletionMark: result.deletionMarks[0] || null,
     deletionMarks: result.deletionMarks,
+    deletionNodes: result.deletionNodes,
   };
 };
 
@@ -449,8 +505,8 @@ const compileTextDelete = (ctx, intent) => {
  * @param {*} ctx
  * @param {number} from
  * @param {number} to
- * @param {{ replacementGroupId: string, replacementSideId: string, sharedDeletionId: string | null, recordSharedDeletionId?: boolean, recordCollapsedIds?: boolean }} options
- * @returns {{ ok: true, deletionMarks: import('prosemirror-model').Mark[], deletionId: string } | TrackedEditFailure}
+ * @param {{ replacementGroupId: string, replacementSideId: string, sharedDeletionId: string | null, recordSharedDeletionId?: boolean, recordCollapsedIds?: boolean, reassignExistingDeletions?: boolean }} options
+ * @returns {{ ok: true, deletionMarks: import('prosemirror-model').Mark[], deletionNodes: import('prosemirror-model').Node[], deletionId: string, mintedThisCall: boolean } | TrackedEditFailure}
  */
 const applyTrackedDelete = (
   ctx,
@@ -462,15 +518,30 @@ const applyTrackedDelete = (
     sharedDeletionId,
     recordSharedDeletionId = false,
     recordCollapsedIds = true,
+    reassignExistingDeletions = false,
   },
 ) => {
   /** @type {Array<import('prosemirror-model').Mark>} */
   const deletionMarks = [];
+  /** @type {Array<import('prosemirror-model').Node>} */
+  const deletionNodes = [];
   // Walk inline leaf nodes and act per node. We never mutate while iterating
   // — collect operations first, then apply in reverse position order so
   // earlier positions remain stable.
-  /** @type {Array<{ kind: 'collapse'|'reassign'|'mark-delete'|'noop', from: number, to: number, changeId?: string, parentId?: string, parentSide?: string, parentReplacementGroupId?: string }>} */
+  /** @type {Array<{ kind: 'collapse'|'mark-delete'|'reassign'|'noop', from: number, to: number, node?: import('prosemirror-model').Node, changeId?: string, parentId?: string, parentSide?: string, parentReplacementGroupId?: string, existingDeleteMarks?: Array<import('prosemirror-model').Mark> }>} */
   const ops = [];
+
+  // Imported-insertion collapse rule (plan §4): no-email imported insertions
+  // collapse only when they are truly unattributed, or when their no-email
+  // display name matches the current user. Named different authors with no
+  // email remain protected review state.
+  const isImportedOwnInsertion = (mark) => {
+    if (!mark) return false;
+    return shouldCollapseNoEmailInsertion({
+      currentUser: ctx.intent.user,
+      insertionAttrs: mark.attrs,
+    });
+  };
 
   ctx.tr.doc.nodesBetween(from, to, (node, pos) => {
     if (!node.isInline || !node.isLeaf) return;
@@ -484,20 +555,42 @@ const applyTrackedDelete = (
 
     if (insertMark) {
       const segmentAtPos = ctx.graph.overlapAt(pos)[0] ?? null;
-      const ownership = classifySegment(ctx, segmentAtPos ?? { attrs: insertMark.attrs });
-      if (ownership === 'same-user') {
+      const classification = classifyOwnership({
+        currentUser: ctx.currentIdentity,
+        change: getChangeAuthorIdentity(segmentAtPos?.attrs ?? insertMark.attrs),
+      });
+      const ownership = isSameUserHighConfidence(classification) ? 'same-user' : 'different-user';
+      if (ownership === 'same-user' || isImportedOwnInsertion(insertMark)) {
         // Own insertion → collapse (remove proposed content).
         ops.push({ kind: 'collapse', from: segFrom, to: segTo, changeId: insertMark.attrs.id });
         return;
       }
       // Different-user inserted content → child trackDelete with overlapParentId.
       const parentId = insertMark.attrs.id;
-      ops.push({ kind: 'mark-delete', from: segFrom, to: segTo, parentId, parentSide: SegmentSide.Inserted });
+      ops.push({
+        kind: 'mark-delete',
+        from: segFrom,
+        to: segTo,
+        node,
+        parentId,
+        parentSide: SegmentSide.Inserted,
+      });
       return;
     }
 
     if (existingDelete) {
       const ownership = classifySegment(ctx, { attrs: existingDelete.attrs });
+      const allExistingDeletes = node.marks.filter((m) => m.type.name === TrackDeleteMarkName);
+      if (reassignExistingDeletions) {
+        ops.push({
+          kind: 'reassign',
+          from: segFrom,
+          to: segTo,
+          node,
+          existingDeleteMarks: allExistingDeletes,
+        });
+        return;
+      }
       if (ownership === 'same-user') {
         // Inside own deletion → no semantic change (preserve original).
         ops.push({ kind: 'noop', from: segFrom, to: segTo });
@@ -508,6 +601,7 @@ const applyTrackedDelete = (
         kind: 'mark-delete',
         from: segFrom,
         to: segTo,
+        node,
         parentId: existingDelete.attrs.id,
         parentSide: SegmentSide.Deleted,
       });
@@ -515,7 +609,7 @@ const applyTrackedDelete = (
     }
 
     // Live content.
-    ops.push({ kind: 'mark-delete', from: segFrom, to: segTo });
+    ops.push({ kind: 'mark-delete', from: segFrom, to: segTo, node });
   });
 
   if (!ops.length) {
@@ -541,6 +635,29 @@ const applyTrackedDelete = (
       continue;
     }
     if (op.kind === 'noop') continue;
+    if (op.kind === 'reassign') {
+      // Replacement over existing deletion: reassign deletion id to the new
+      // deletion mark so the new replacement encloses the prior delete.
+      const mark = makeDeleteMark(ctx, {
+        id: deletionId,
+        overlapParentId: '',
+        replacementGroupId,
+        replacementSideId,
+      });
+      try {
+        for (const m of op.existingDeleteMarks ?? []) ctx.tr.removeMark(op.from, op.to, m);
+        ctx.tr.addMark(op.from, op.to, mark);
+        deletionMarks.push(mark);
+        if (op.node) deletionNodes.push(op.node);
+        if (!mintedThisCall) {
+          if (!sharedDeletionId || recordSharedDeletionId) ctx.createdChangeIds.push(deletionId);
+          mintedThisCall = true;
+        }
+      } catch (error) {
+        return failure('INVALID_TARGET', /** @type {Error} */ (error).message ?? 'addMark failed.');
+      }
+      continue;
+    }
     if (op.kind === 'mark-delete') {
       const mark = makeDeleteMark(ctx, {
         id: deletionId,
@@ -551,6 +668,7 @@ const applyTrackedDelete = (
       try {
         ctx.tr.addMark(op.from, op.to, mark);
         deletionMarks.push(mark);
+        if (op.node) deletionNodes.push(op.node);
         if (!mintedThisCall) {
           if (!sharedDeletionId || recordSharedDeletionId) ctx.createdChangeIds.push(deletionId);
           mintedThisCall = true;
@@ -572,7 +690,7 @@ const applyTrackedDelete = (
     }
   }
 
-  return { ok: true, deletionMarks, deletionId };
+  return { ok: true, deletionMarks, deletionNodes, deletionId, mintedThisCall };
 };
 
 // ---------------------------------------------------------------------------
@@ -664,54 +782,202 @@ const compileTextReplace = (ctx, intent) => {
     return applyInsert(ctx, intent.from, sanitizedSlice, insertMark, insertId, { create: true });
   }
 
+  // Different-user nested case: the replacement happens inside another author's
+  // open review item. Each side must remain independently reviewable, so use
+  // distinct ids and the exact edit location for the insertion.
   const replacementParentId = getReplacementParentId(ctx, segments);
-  // Paired vs independent: in paired mode share one id between insert+delete
-  // sides so a top-level replacement projects as one logical graph change.
-  // A replacement nested inside another author's open review item must keep
-  // each side separately reviewable, so those child sides intentionally use
-  // distinct ids even when the caller's default replacement mode is paired.
+
+  // Ordinary live replacement: use the proven "insert after deleted range"
+  // algorithm so existing product behavior is preserved (paragraph order on
+  // multi-paragraph replacements, SD-3044 shared-anchor rewrites,
+  // accept-side text identity). The compiler is the single semantic center;
+  // markInsertion / markDeletion are used as low-level primitives.
+  return compileOrdinaryTextReplace(ctx, intent, sanitizedSlice, replacementParentId);
+};
+
+/**
+ * Ordinary text replacement (no own-inserted refinement, no own-deletion
+ * preservation). Mirrors the legacy `replaceStep` algorithm verbatim and is
+ * the only ordinary-replacement implementation: there is no dual semantic
+ * path. The compiler owns the decision tree; the legacy markInsertion /
+ * markDeletion helpers are imported as low-level primitives.
+ *
+ * Order of operations:
+ *   1. Optionally probe for an adjacent tracked-delete span (single-step
+ *      user replace only; multi-step transactions don't probe).
+ *   2. In a throwaway temp transaction, insert the original slice at the
+ *      chosen position. Fall back to Slice.maxOpen on failure to make
+ *      paste-into-textblock cases merge inline.
+ *   3. Mark the inserted range with the insertion mark (refining same-user
+ *      adjacent ids if present) in the temp tr.
+ *   4. Extract the marked slice and apply it as a single condensed
+ *      ReplaceStep on ctx.tr (so the tracked-transaction stays single-step).
+ *   5. Run applyTrackedDelete on the original range to mark deletion (this
+ *      may collapse own insertions, reassign existing deletions, etc.).
+ *   6. Map insertedTo through the delete-induced mapping so the selection /
+ *      meta still points after the inserted content.
+ *
+ * @param {*} ctx
+ * @param {TrackedEditIntent & { kind: 'text-replace' }} intent
+ * @param {import('prosemirror-model').Slice} sanitizedSlice
+ * @param {string} replacementParentId
+ * @returns {TrackedEditResult}
+ */
+const compileOrdinaryTextReplace = (ctx, intent, sanitizedSlice, replacementParentId) => {
+  // In paired mode share one id between insert/delete sides so a top-level
+  // replacement projects as one logical graph change. A replacement nested
+  // inside another author's open review item must keep each side separately
+  // reviewable, so those child sides intentionally use distinct ids even when
+  // the caller's default replacement mode is paired.
   const shouldPairReplacement = intent.replacements === 'paired' && !replacementParentId;
   const sharedId = shouldPairReplacement ? intent.replacementGroupHint || uuidv4() : null;
   const replacementGroupId = sharedId ?? '';
-  const replacementSideId = sharedId ? `${sharedId}#deleted` : '';
 
-  // Step 1 — tracked delete (collapses own insertions, marks live/other content).
-  if (intent.from !== intent.to) {
-    const delResult = applyTrackedDelete(ctx, intent.from, intent.to, {
-      replacementGroupId,
-      replacementSideId,
-      sharedDeletionId: sharedId,
-    });
-    if (delResult.ok === false) return delResult;
-    if (sharedId && delResult.deletionMarks?.length) {
-      ctx.createdChangeIds.push(sharedId);
+  // 1. Probe for adjacent tracked-delete span at intent.to - 1 (legacy
+  //    behavior). Only applies for single-step user actions — plan-engine
+  //    multi-step rewrites must not probe.
+  let positionTo = intent.to;
+  if (intent.from !== intent.to && intent.probeForDeletionSpan) {
+    const probePos = Math.max(intent.from, intent.to - 1);
+    const deletionSpan = findMarkPosition(ctx.tr.doc, probePos, TrackDeleteMarkName);
+    if (deletionSpan && deletionSpan.to > positionTo) positionTo = deletionSpan.to;
+  }
+
+  // 2. Build a temp insertion in a throwaway transaction so we can read the
+  //    inserted positions and the marked slice. We then condense the result
+  //    into a single ReplaceStep on ctx.tr.
+  const baseParentIsTextblock = ctx.tr.doc.resolve(positionTo).parent?.isTextblock;
+  const shouldPreferInlineInsertion = intent.from === intent.to && baseParentIsTextblock;
+
+  const tryTempInsert = (slice) => {
+    const tempTr = ctx.state.apply(ctx.tr).tr;
+    const isEmptySlice = !slice || slice.content.size === 0;
+    try {
+      tempTr.replaceRange(positionTo, positionTo, slice ?? Slice.empty);
+    } catch {
+      return null;
+    }
+    if (!tempTr.docChanged && !isEmptySlice) return null;
+    const insertedFrom = tempTr.mapping.map(positionTo, -1);
+    const insertedTo = tempTr.mapping.map(positionTo, 1);
+    if (insertedFrom === insertedTo) return { tempTr, insertedFrom, insertedTo };
+    if (shouldPreferInlineInsertion && !tempTr.doc.resolve(insertedFrom).parent?.isTextblock) return null;
+    return { tempTr, insertedFrom, insertedTo };
+  };
+
+  let insertion = null;
+  if (sanitizedSlice.content.size) {
+    const openSlice = Slice.maxOpen(sanitizedSlice.content, true);
+    insertion = tryTempInsert(sanitizedSlice) || tryTempInsert(openSlice);
+    if (!insertion) {
+      return failure('CAPABILITY_UNAVAILABLE', 'replacement slice could not be inserted into the document.');
     }
   }
 
-  // Step 2 — tracked insert at the original `from`. Recompute graph context
-  // after the deletion so own-insertion collapse adjustments don't push the
-  // insertion past the intended cursor.
-  if (sanitizedSlice.content.size) {
-    // We must re-resolve the insertion position because collapsed
-    // own-insertion content shrinks the doc.
-    const insertId = sharedId ?? intent.replacementGroupHint ?? uuidv4();
-    const insertMark = makeInsertMark(ctx, {
-      id: insertId,
-      overlapParentId: replacementParentId,
-      replacementGroupId,
-      replacementSideId: sharedId ? `${sharedId}#inserted` : '',
+  /** @type {import('prosemirror-model').Mark | null} */
+  let insertedMark = null;
+  /** @type {import('prosemirror-model').Slice} */
+  let trackedInsertedSlice = Slice.empty;
+  /** @type {Array<import('prosemirror-model').Node>} */
+  const insertedNodes = [];
+
+  if (insertion && insertion.insertedFrom !== insertion.insertedTo) {
+    const { tempTr, insertedFrom, insertedTo } = insertion;
+    // Use the legacy markInsertion primitive so id reuse / refinement matches
+    // existing behavior exactly. Compiler-specific overlap fields
+    // (overlapParentId, replacementGroupId, replacementSideId) are layered on
+    // afterward.
+    const forcedInsertId = sharedId || (replacementParentId ? uuidv4() : undefined);
+    insertedMark = markInsertion({
+      tr: tempTr,
+      from: insertedFrom,
+      to: insertedTo,
+      user: ctx.intent.user,
+      date: ctx.intent.date,
+      id: forcedInsertId,
     });
-    const insertPos = clampToDocSize(ctx.tr.doc.content.size, intent.from);
-    const insertResult = applyInsert(ctx, insertPos, sanitizedSlice, insertMark, insertId, {
-      create: sharedId ? false : true,
-      update: sharedId ? true : false,
+    if (!insertedMark) {
+      return failure('PRECONDITION_FAILED', 'Failed to create tracked insertion mark for replacement.');
+    }
+    if (replacementParentId || replacementGroupId) {
+      const overlayMark = makeInsertMark(ctx, {
+        id: insertedMark.attrs.id,
+        overlapParentId: replacementParentId,
+        replacementGroupId,
+        replacementSideId: sharedId ? `${sharedId}#inserted` : '',
+      });
+      tempTr.removeMark(insertedFrom, insertedTo, insertedMark);
+      tempTr.addMark(insertedFrom, insertedTo, overlayMark);
+      insertedMark = overlayMark;
+    }
+    const insertId = /** @type {import('prosemirror-model').Mark} */ (insertedMark).attrs.id;
+    if (!ctx.createdChangeIds.includes(insertId) && !ctx.updatedChangeIds.includes(insertId)) {
+      ctx.createdChangeIds.push(insertId);
+    }
+    trackedInsertedSlice = tempTr.doc.slice(insertedFrom, insertedTo);
+    tempTr.doc.nodesBetween(insertedFrom, insertedTo, (node) => {
+      if (node.isInline) insertedNodes.push(node);
     });
-    if (!insertResult.ok) return insertResult;
-    return {
-      ...insertResult,
-      selection: { kind: 'near', pos: insertResult.insertedTo, bias: 1 },
-    };
   }
+
+  // 3. Apply the condensed insertion step to ctx.tr.
+  let insertedFromAbs = positionTo;
+  let insertedToAbs = positionTo;
+  let insertedLength = 0;
+  /** @type {import('prosemirror-transform').ReplaceStep | null} */
+  let condensedStep = null;
+  if (trackedInsertedSlice && trackedInsertedSlice.content.size) {
+    const stepIndexBeforeCondensed = ctx.tr.steps.length;
+    condensedStep = new ReplaceStep(positionTo, positionTo, trackedInsertedSlice, false);
+    if (ctx.tr.maybeStep(condensedStep).failed) {
+      return failure('INVALID_TARGET', 'condensed insertion step failed to apply.');
+    }
+    // Record the actual inserted range using just the condensed step's map.
+    const condensedMap = ctx.tr.steps[stepIndexBeforeCondensed].getMap();
+    insertedFromAbs = condensedMap.map(positionTo, -1);
+    insertedToAbs = condensedMap.map(positionTo, 1);
+    insertedLength = insertedToAbs - insertedFromAbs;
+  }
+
+  // 4. Apply tracked delete on the original range. The range positions are
+  //    unaffected by the insertion (insertion happened at positionTo which is
+  //    >= intent.to). The delete may collapse own insertions inside the
+  //    range, shifting the doc — we map the inserted position through the
+  //    delete-induced map after.
+  /** @type {Array<import('prosemirror-model').Mark>} */
+  let deletionMarks = [];
+  /** @type {Array<import('prosemirror-model').Node>} */
+  let deletionNodes = [];
+  /** @type {import('prosemirror-model').Mark | null} */
+  let deletionMark = null;
+
+  if (intent.from !== intent.to) {
+    const stepsBefore = ctx.tr.steps.length;
+    const delResult = applyTrackedDelete(ctx, intent.from, intent.to, {
+      replacementGroupId,
+      replacementSideId: sharedId ? `${sharedId}#deleted` : '',
+      sharedDeletionId: sharedId,
+      reassignExistingDeletions: Boolean(sharedId),
+    });
+    if (delResult.ok === false) return delResult;
+    deletionMarks = delResult.deletionMarks;
+    deletionMark = delResult.deletionMarks[0] || null;
+    deletionNodes = delResult.deletionNodes;
+    // Map inserted positions through delete steps so collapses don't strand
+    // them past stale offsets.
+    if (insertedLength > 0) {
+      const delMapping = new Mapping();
+      for (let i = stepsBefore; i < ctx.tr.steps.length; i += 1) {
+        delMapping.appendMap(ctx.tr.steps[i].getMap());
+      }
+      insertedFromAbs = delMapping.map(insertedFromAbs, 1);
+      insertedToAbs = delMapping.map(insertedToAbs, 1);
+    }
+  }
+
+  /** @type {SelectionHint} */
+  const selection =
+    insertedLength > 0 ? { kind: 'near', pos: insertedToAbs, bias: 1 } : { kind: 'near', pos: intent.from, bias: -1 };
 
   return {
     ok: true,
@@ -720,7 +986,15 @@ const compileTextReplace = (ctx, intent) => {
     updatedChangeIds: ctx.updatedChangeIds,
     removedChangeIds: ctx.removedChangeIds,
     remappedChangeIds: ctx.remappedChangeIds,
-    selection: { kind: 'near', pos: intent.from, bias: -1 },
+    selection,
+    insertedMark,
+    insertedFrom: insertedFromAbs,
+    insertedTo: insertedToAbs,
+    insertedNodes,
+    insertedStep: condensedStep,
+    deletionMark,
+    deletionMarks,
+    deletionNodes,
   };
 };
 
@@ -747,7 +1021,7 @@ const getReplacementParentId = (ctx, segments) => {
 };
 
 // ---------------------------------------------------------------------------
-// format-apply / format-remove (SD-486 folding)
+// format-apply / format-remove
 // ---------------------------------------------------------------------------
 
 /**
@@ -760,82 +1034,39 @@ const compileFormat = (ctx, intent) => {
     return failure('CAPABILITY_UNAVAILABLE', `Mark ${intent.mark.type.name} is not a tracked formatting mark.`);
   }
 
-  // Walk segments in range. For each contiguous subrange:
-  //   - if covered by same-user own insertion (or replacement inserted side),
-  //     directly apply/remove the mark (SD-486 fold).
-  //   - if covered by other-user inserted content, defer to trackFormat
-  //     creation. To minimize compiler/legacy duplication we leave this to
-  //     the existing addMarkStep/removeMarkStep helper by returning a hint;
-  //     however since the compiler must drive consistent semantics, we
-  //     directly create the formatting change here over the entire other-
-  //     content range using the same canonical attrs.
-  //   - if mixed structural ranges (paragraph boundaries we can't safely
-  //     model under the tracked text scope), fail closed.
-  const subranges = computeFormatSubranges(ctx, intent.from, intent.to);
-  if (!subranges) return failure('CAPABILITY_UNAVAILABLE', 'format range crosses unsupported structural boundary.');
+  const subranges = computeFormatLeafRanges(ctx, intent.from, intent.to);
+  if (!subranges) return failure('CAPABILITY_UNAVAILABLE', 'format range crosses tracked-deleted content.');
 
   const trackFormatType = ctx.schema.marks[TrackFormatMarkName];
-  if (!trackFormatType) return failure('CAPABILITY_UNAVAILABLE', 'schema is missing trackFormat mark.');
+  const needsTrackFormat = subranges.some((range) => !range.fold);
+  if (!trackFormatType && needsTrackFormat) {
+    return failure('CAPABILITY_UNAVAILABLE', 'schema is missing trackFormat mark.');
+  }
 
   /** @type {Array<import('prosemirror-model').Mark>} */
   const formatMarks = [];
+  /** @type {string | null} */
+  let sharedWid = null;
 
   for (const range of subranges) {
-    if (intent.kind === 'format-apply') {
-      if (range.fold) {
-        ctx.tr.addMark(range.from, range.to, intent.mark);
-      } else {
-        ctx.tr.addMark(range.from, range.to, intent.mark);
-        const formatMark = trackFormatType.create({
-          id: uuidv4(),
-          author: ctx.intent.user.name || '',
-          authorEmail: ctx.intent.user.email || '',
-          authorImage: ctx.intent.user.image || '',
-          date: ctx.intent.date,
-          before: [],
-          after: [{ type: intent.mark.type.name, attrs: intent.mark.attrs }],
-          sourceId: '',
-          importedAuthor: '',
-          revisionGroupId: '',
-          splitFromId: '',
-          changeType: CanonicalChangeType.Formatting,
-          replacementGroupId: '',
-          replacementSideId: '',
-          overlapParentId: range.parentId || '',
-          sourceIds: null,
-          origin: '',
-        });
-        ctx.tr.addMark(range.from, range.to, formatMark);
-        formatMarks.push(formatMark);
-        ctx.createdChangeIds.push(formatMark.attrs.id);
-      }
-    } else {
-      if (range.fold) {
-        ctx.tr.removeMark(range.from, range.to, intent.mark);
-      } else {
-        ctx.tr.removeMark(range.from, range.to, intent.mark);
-        const formatMark = trackFormatType.create({
-          id: uuidv4(),
-          author: ctx.intent.user.name || '',
-          authorEmail: ctx.intent.user.email || '',
-          authorImage: ctx.intent.user.image || '',
-          date: ctx.intent.date,
-          before: [{ type: intent.mark.type.name, attrs: intent.mark.attrs }],
-          after: [],
-          sourceId: '',
-          importedAuthor: '',
-          revisionGroupId: '',
-          splitFromId: '',
-          changeType: CanonicalChangeType.Formatting,
-          replacementGroupId: '',
-          replacementSideId: '',
-          overlapParentId: range.parentId || '',
-          sourceIds: null,
-          origin: '',
-        });
-        ctx.tr.addMark(range.from, range.to, formatMark);
-        formatMarks.push(formatMark);
-        ctx.createdChangeIds.push(formatMark.attrs.id);
+    if (range.fold) {
+      if (intent.kind === 'format-apply') ctx.tr.addMark(range.from, range.to, intent.mark);
+      else ctx.tr.removeMark(range.from, range.to, intent.mark);
+      continue;
+    }
+
+    const result = applyTrackedFormatRange({
+      ctx,
+      intent,
+      range,
+      trackFormatType,
+      sharedWid,
+    });
+    sharedWid = result.sharedWid;
+    if (result.formatMark) {
+      formatMarks.push(result.formatMark);
+      if (!ctx.createdChangeIds.includes(result.formatMark.attrs.id)) {
+        ctx.createdChangeIds.push(result.formatMark.attrs.id);
       }
     }
   }
@@ -852,67 +1083,234 @@ const compileFormat = (ctx, intent) => {
 };
 
 /**
- * Build the list of contiguous subranges inside [from, to] that share the
- * same "format folding" decision. Returns null when the range crosses a
- * boundary the compiler refuses to handle (e.g. a non-textblock structural
- * node).
+ * Collect leaf inline formatting ranges. Same-user inserted ranges fold the
+ * live mark directly into the insertion; all other live/other-user inserted
+ * ranges use the normal trackFormat snapshot model. Tracked-deleted content
+ * fails closed because applying visual formatting there is not safely
+ * representable as an independent review action.
  *
- * @returns {Array<{ from: number, to: number, fold: boolean, parentId?: string }> | null}
+ * @returns {Array<{ from: number, to: number, fold: boolean, parentId?: string, node: import('prosemirror-model').Node }> | null}
  */
-const computeFormatSubranges = (ctx, from, to) => {
-  /** @type {Array<{ from: number, to: number, fold: boolean, parentId?: string }>} */
-  const out = [];
-  let boundaryCrossed = false;
-  let lastTextBlock = null;
+const computeFormatLeafRanges = (ctx, from, to) => {
+  /** @type {Array<{ from: number, to: number, fold: boolean, parentId?: string, node: import('prosemirror-model').Node }>} */
+  const ranges = [];
+  let touchesDeletion = false;
 
   ctx.tr.doc.nodesBetween(from, to, (node, pos) => {
+    if (touchesDeletion) return false;
     if (!node.isInline || node.type.name === 'run') return;
-    if (boundaryCrossed) return false;
-    // Identify the textblock parent of this inline leaf.
-    const $pos = ctx.tr.doc.resolve(pos);
-    const parent = $pos.parent?.type?.name ?? '';
-    if (!parent) return;
-    if (lastTextBlock === null) lastTextBlock = parent;
-    // We do not consider crossing textblocks unsafe here; PM clips ranges
-    // to inline content. The compiler refuses only structural marks (handled
-    // by the SUPPORTED_KINDS check above).
 
     const segFrom = Math.max(from, pos);
     const segTo = Math.min(to, pos + node.nodeSize);
     if (segFrom >= segTo) return;
 
+    const deleteMark = node.marks.find((m) => m.type.name === TrackDeleteMarkName);
+    if (deleteMark) {
+      touchesDeletion = true;
+      return false;
+    }
+
     const insertMark = node.marks.find((m) => m.type.name === TrackInsertMarkName);
     if (insertMark) {
       const ownership = classifySegment(ctx, { attrs: insertMark.attrs });
-      if (ownership === 'same-user') {
-        appendSubrange(out, { from: segFrom, to: segTo, fold: true });
-      } else {
-        appendSubrange(out, { from: segFrom, to: segTo, fold: false, parentId: insertMark.attrs.id });
-      }
+      ranges.push({
+        from: segFrom,
+        to: segTo,
+        fold: ownership === 'same-user',
+        ...(ownership === 'same-user' ? {} : { parentId: insertMark.attrs.id }),
+        node,
+      });
       return;
     }
-    const deleteMark = node.marks.find((m) => m.type.name === TrackDeleteMarkName);
-    if (deleteMark) {
-      // Tracked-deleted content: do not modify formatting; legacy addMarkStep
-      // also skips this. Fail closed to avoid silent drift.
-      boundaryCrossed = true;
-      return false;
-    }
-    appendSubrange(out, { from: segFrom, to: segTo, fold: false });
+
+    ranges.push({ from: segFrom, to: segTo, fold: false, node });
   });
 
-  if (boundaryCrossed) return null;
-  return out;
+  if (touchesDeletion) return null;
+  return ranges;
 };
 
-const appendSubrange = (out, range) => {
-  const last = out[out.length - 1];
-  if (last && last.fold === range.fold && last.parentId === range.parentId && last.to === range.from) {
-    last.to = range.to;
-    return;
+/**
+ * Apply ordinary tracked formatting semantics for one leaf range, preserving
+ * the previous snapshot behavior while allowing overlap-parent metadata when
+ * formatting another user's inserted text.
+ *
+ * @param {{
+ *   ctx: *,
+ *   intent: TrackedEditIntent & { kind: 'format-apply'|'format-remove' },
+ *   range: { from: number, to: number, parentId?: string, node: import('prosemirror-model').Node },
+ *   trackFormatType: import('prosemirror-model').MarkType,
+ *   sharedWid: string | null,
+ * }} input
+ * @returns {{ sharedWid: string | null, formatMark: import('prosemirror-model').Mark | null }}
+ */
+const applyTrackedFormatRange = ({ ctx, intent, range, trackFormatType, sharedWid }) => {
+  if (intent.kind === 'format-apply') {
+    return applyTrackedFormatAdd({ ctx, intent, range, trackFormatType, sharedWid });
   }
-  out.push(range);
+  return applyTrackedFormatRemove({ ctx, intent, range, trackFormatType, sharedWid });
 };
+
+const applyTrackedFormatAdd = ({ ctx, intent, range, trackFormatType, sharedWid }) => {
+  const liveMarks = getLiveInlineMarksInRange({
+    doc: ctx.tr.doc,
+    from: range.from,
+    to: range.to,
+  });
+  const existingChangeMark = liveMarks.find((mark) =>
+    [TrackDeleteMarkName, TrackFormatMarkName].includes(mark.type.name),
+  );
+  const wid = existingChangeMark ? existingChangeMark.attrs.id : (sharedWid ?? uuidv4());
+
+  ctx.tr.addMark(range.from, range.to, intent.mark);
+
+  if (!hasMatchingMark(liveMarks, intent.mark)) {
+    const formatChangeMark = liveMarks.find((mark) => mark.type.name === TrackFormatMarkName);
+    let after = [];
+    let before = [];
+
+    if (formatChangeMark) {
+      const beforeSnapshots = Array.isArray(formatChangeMark.attrs.before) ? formatChangeMark.attrs.before : [];
+      const afterSnapshots = Array.isArray(formatChangeMark.attrs.after) ? formatChangeMark.attrs.after : [];
+      const foundBefore = beforeSnapshots.find((mark) => markSnapshotMatchesStepMark(mark, intent.mark, true));
+
+      if (foundBefore) {
+        before = beforeSnapshots.filter((mark) => !markSnapshotMatchesStepMark(mark, intent.mark, true));
+        after = afterSnapshots.filter((mark) => getTypeName(mark) !== intent.mark.type.name);
+      } else {
+        before = [...beforeSnapshots];
+        after = upsertMarkSnapshotByType(afterSnapshots, {
+          type: intent.mark.type.name,
+          attrs: intent.mark.attrs,
+        });
+      }
+    } else {
+      const existingMarkOfSameType = liveMarks.find(
+        (mark) =>
+          mark.type.name === intent.mark.type.name &&
+          ![TrackDeleteMarkName, TrackFormatMarkName].includes(mark.type.name),
+      );
+      before = existingMarkOfSameType
+        ? [createMarkSnapshot(existingMarkOfSameType.type.name, existingMarkOfSameType.attrs)]
+        : [];
+      after = [createMarkSnapshot(intent.mark.type.name, intent.mark.attrs)];
+    }
+
+    if (isTrackFormatNoOp(before, after)) {
+      if (formatChangeMark) ctx.tr.removeMark(range.from, range.to, formatChangeMark);
+      return { sharedWid: wid, formatMark: null };
+    }
+
+    if (after.length || before.length) {
+      const formatMark = createTrackFormatMark({
+        ctx,
+        trackFormatType,
+        id: wid,
+        before,
+        after,
+        parentId: range.parentId || '',
+        existingFormatMark: formatChangeMark,
+      });
+      ctx.tr.addMark(range.from, range.to, formatMark);
+      return { sharedWid: wid, formatMark };
+    }
+
+    if (formatChangeMark) ctx.tr.removeMark(range.from, range.to, formatChangeMark);
+  }
+
+  return { sharedWid: wid, formatMark: null };
+};
+
+const applyTrackedFormatRemove = ({ ctx, intent, range, trackFormatType, sharedWid }) => {
+  const liveMarksBeforeRemove = getLiveInlineMarksInRange({
+    doc: ctx.tr.doc,
+    from: range.from,
+    to: range.to,
+  });
+  ctx.tr.removeMark(range.from, range.to, intent.mark);
+
+  if (!hasMatchingMark(liveMarksBeforeRemove, intent.mark)) {
+    return { sharedWid, formatMark: null };
+  }
+
+  const formatChangeMark = liveMarksBeforeRemove.find((mark) => mark.type.name === TrackFormatMarkName);
+  let after = [];
+  let before = [];
+
+  if (formatChangeMark) {
+    const afterSnapshots = Array.isArray(formatChangeMark.attrs.after) ? formatChangeMark.attrs.after : [];
+    const beforeSnapshots = Array.isArray(formatChangeMark.attrs.before) ? formatChangeMark.attrs.before : [];
+    const foundAfter = afterSnapshots.find((mark) => markSnapshotMatchesStepMark(mark, intent.mark, true));
+
+    if (foundAfter) {
+      after = afterSnapshots.filter((mark) => !markSnapshotMatchesStepMark(mark, intent.mark, true));
+      if (after.length === 0) {
+        const remainingFormatMarks = liveMarksBeforeRemove.filter(
+          (m) =>
+            ![TrackDeleteMarkName, TrackFormatMarkName].includes(m.type.name) && m.type.name !== intent.mark.type.name,
+        );
+        const isNoop = beforeSnapshots.every((snapshot) =>
+          remainingFormatMarks.some((m) => markSnapshotMatchesStepMark(snapshot, m, true)),
+        );
+        if (isNoop) {
+          ctx.tr.removeMark(range.from, range.to, formatChangeMark);
+          return { sharedWid: formatChangeMark.attrs.id || sharedWid, formatMark: null };
+        }
+      }
+      before = [...beforeSnapshots];
+    } else {
+      after = [...afterSnapshots];
+      before = upsertMarkSnapshotByType(beforeSnapshots, {
+        type: intent.mark.type.name,
+        attrs: intent.mark.attrs,
+      });
+    }
+  } else {
+    after = [];
+    const existingMark = range.node.marks.find((mark) => mark.type === intent.mark.type);
+    before = existingMark ? [createMarkSnapshot(intent.mark.type.name, existingMark.attrs)] : [];
+  }
+
+  if (after.length || before.length) {
+    const wid = formatChangeMark ? formatChangeMark.attrs.id : (sharedWid ?? uuidv4());
+    const formatMark = createTrackFormatMark({
+      ctx,
+      trackFormatType,
+      id: wid,
+      before,
+      after,
+      parentId: range.parentId || '',
+      existingFormatMark: formatChangeMark,
+    });
+    ctx.tr.addMark(range.from, range.to, formatMark);
+    return { sharedWid: wid, formatMark };
+  }
+
+  if (formatChangeMark) ctx.tr.removeMark(range.from, range.to, formatChangeMark);
+  return { sharedWid: formatChangeMark?.attrs?.id || sharedWid, formatMark: null };
+};
+
+const createTrackFormatMark = ({ ctx, trackFormatType, id, before, after, parentId, existingFormatMark }) =>
+  trackFormatType.create({
+    id,
+    sourceId: existingFormatMark?.attrs?.sourceId || '',
+    author: ctx.intent.user.name || '',
+    authorId: ctx.intent.user.id || '',
+    authorEmail: ctx.intent.user.email || '',
+    authorImage: ctx.intent.user.image || '',
+    date: ctx.intent.date,
+    before,
+    after,
+    importedAuthor: existingFormatMark?.attrs?.importedAuthor || '',
+    revisionGroupId: existingFormatMark?.attrs?.revisionGroupId || id,
+    splitFromId: existingFormatMark?.attrs?.splitFromId || '',
+    changeType: CanonicalChangeType.Formatting,
+    replacementGroupId: '',
+    replacementSideId: '',
+    overlapParentId: parentId || existingFormatMark?.attrs?.overlapParentId || '',
+    sourceIds: existingFormatMark?.attrs?.sourceIds ?? null,
+    origin: existingFormatMark?.attrs?.origin || '',
+  });
 
 /**
  * Find the segment that strictly contains `pos` if any. When no segment
@@ -925,4 +1323,4 @@ const findContainingSegment = (ctx, pos) => findSegmentAt(ctx, pos);
 // Diagnostics surfaced for telemetry/tests.
 // ---------------------------------------------------------------------------
 
-export const compilerInternalsForTest = { stripTrackedMarksFromSlice, classifySegment, computeFormatSubranges };
+export const compilerInternalsForTest = { stripTrackedMarksFromSlice, classifySegment };

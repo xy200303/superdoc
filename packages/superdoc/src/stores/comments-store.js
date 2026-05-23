@@ -216,17 +216,20 @@ export const useCommentsStore = defineStore('comments', () => {
     if (!comment) return;
     if (
       comment.resolvedTime !== undefined ||
+      comment.resolvedById !== undefined ||
       comment.resolvedByEmail !== undefined ||
       comment.resolvedByName !== undefined
     ) {
       trackedChangeResolutionSnapshots.set(comment, {
         resolvedTime: comment.resolvedTime ?? null,
+        resolvedById: comment.resolvedById ?? null,
         resolvedByEmail: comment.resolvedByEmail ?? null,
         resolvedByName: comment.resolvedByName ?? null,
       });
     }
     // Sets the resolved state to null so it can be restored in the comments sidebar
     comment.resolvedTime = null;
+    comment.resolvedById = null;
     comment.resolvedByEmail = null;
     comment.resolvedByName = null;
   };
@@ -518,6 +521,7 @@ export const useCommentsStore = defineStore('comments', () => {
       trackedChangeType,
       trackedChangeDisplayType,
       deletedText,
+      authorId,
       authorEmail,
       authorImage,
       date,
@@ -557,6 +561,7 @@ export const useCommentsStore = defineStore('comments', () => {
       trackedChangeDisplayType,
       deletedText,
       createdTime: date,
+      creatorId: authorId ?? null,
       creatorName: authorName,
       creatorEmail: authorEmail,
       creatorImage: authorImage,
@@ -606,6 +611,7 @@ export const useCommentsStore = defineStore('comments', () => {
     };
 
     const setIfChanged = (target, key, value) => {
+      if (target?.[key] == null && value == null) return false;
       if (!target || shallowEqual(target[key], value)) return false;
       target[key] = value;
       return true;
@@ -635,6 +641,11 @@ export const useCommentsStore = defineStore('comments', () => {
         trackedChangeType: trackedChangeType ?? null,
         trackedChangeDisplayType: trackedChangeDisplayType ?? null,
         deletedText: deletedText ?? null,
+        creatorId: authorId ?? null,
+        creatorName: authorName ?? null,
+        creatorEmail: authorEmail ?? null,
+        creatorImage: authorImage ?? null,
+        createdTime: date ?? null,
       };
 
       let didChange = false;
@@ -646,7 +657,10 @@ export const useCommentsStore = defineStore('comments', () => {
 
     const updateExistingTrackedChange = (trackedComment) => {
       const wasResolved = Boolean(
-        trackedComment.resolvedTime || trackedComment.resolvedByEmail || trackedComment.resolvedByName,
+        trackedComment.resolvedTime ||
+          trackedComment.resolvedById ||
+          trackedComment.resolvedByEmail ||
+          trackedComment.resolvedByName,
       );
       if (wasResolved) clearResolvedMetadata(trackedComment);
       // AIDEV-NOTE: Targeted tracked-change refresh runs during body typing.
@@ -684,6 +698,7 @@ export const useCommentsStore = defineStore('comments', () => {
     } else if (event === 'resolve') {
       const existingTrackedChange = findTrackedChangeById();
       const resolveArgs = {
+        id: params.resolvedById ?? superdoc?.user?.id ?? null,
         email: params.resolvedByEmail ?? superdoc?.user?.email ?? null,
         name: params.resolvedByName ?? superdoc?.user?.name ?? null,
         superdoc,
@@ -988,6 +1003,7 @@ export const useCommentsStore = defineStore('comments', () => {
       fileId: activeDocument.id,
       fileType: activeDocument.type,
       parentCommentId,
+      creatorId: superdocStore.user.id,
       creatorEmail: superdocStore.user.email,
       creatorName: superdocStore.user.name,
       creatorImage: superdocStore.user.image,
@@ -1186,6 +1202,7 @@ export const useCommentsStore = defineStore('comments', () => {
         isInternal: false,
         parentCommentId: comment.parentCommentId,
         trackedChangeParentId: comment.trackedChangeParentId,
+        creatorId: null,
         creatorName,
         createdTime: comment.createdTime,
         creatorEmail: comment.creatorEmail,
@@ -1195,6 +1212,7 @@ export const useCommentsStore = defineStore('comments', () => {
         },
         commentText: htmlContent,
         resolvedTime: comment.isDone ? Date.now() : null,
+        resolvedById: null,
         resolvedByEmail: comment.isDone ? comment.creatorEmail : null,
         resolvedByName: comment.isDone ? importedName || '(Imported)' : null,
         trackedChange: comment.trackedChange || false,
@@ -1404,6 +1422,7 @@ export const useCommentsStore = defineStore('comments', () => {
       const resolutionSnapshot = trackedChangeResolutionSnapshots.get(comment);
       if (resolutionSnapshot) {
         comment.resolvedTime = resolutionSnapshot.resolvedTime ?? Date.now();
+        comment.resolvedById = resolutionSnapshot.resolvedById ?? null;
         comment.resolvedByEmail = resolutionSnapshot.resolvedByEmail ?? null;
         comment.resolvedByName = resolutionSnapshot.resolvedByName ?? null;
         restoredComments.push(comment);
@@ -1593,6 +1612,7 @@ export const useCommentsStore = defineStore('comments', () => {
       trackedChangeType: snapshot.type,
       trackedChangeDisplayType: snapshot.type,
       deletedText: snapshot.type === 'delete' ? (snapshot.excerpt ?? '') : null,
+      authorId: snapshot.authorId,
       authorEmail: snapshot.authorEmail,
       authorImage: snapshot.authorImage,
       date: snapshot.date,

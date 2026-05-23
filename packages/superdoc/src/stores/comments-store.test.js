@@ -604,7 +604,7 @@ describe('comments-store', () => {
   it('resolves tracked change comments on resolve events', () => {
     const superdoc = {
       emit: vi.fn(),
-      user: { email: 'reviewer@example.com', name: 'Reviewer' },
+      user: { id: 'reviewer-id', email: 'reviewer@example.com', name: 'Reviewer' },
     };
 
     const existingComment = {
@@ -614,8 +614,9 @@ describe('comments-store', () => {
       resolvedByEmail: null,
       resolvedByName: null,
       getValues: vi.fn(() => ({ commentId: 'change-resolve-1', resolvedTime: Date.now() })),
-      resolveComment: vi.fn(function ({ email, name }) {
+      resolveComment: vi.fn(function ({ id, email, name }) {
         this.resolvedTime = Date.now();
+        this.resolvedById = id;
         this.resolvedByEmail = email;
         this.resolvedByName = name;
         const emitData = { type: comments_module_events.RESOLVED, comment: this.getValues() };
@@ -634,6 +635,7 @@ describe('comments-store', () => {
     });
 
     expect(existingComment.resolveComment).toHaveBeenCalledWith({
+      id: 'reviewer-id',
       email: 'reviewer@example.com',
       name: 'Reviewer',
       superdoc,
@@ -654,7 +656,7 @@ describe('comments-store', () => {
   it('cascades resolve to user comments anchored to the same tracked change (SD-2528)', async () => {
     const superdoc = {
       emit: vi.fn(),
-      user: { email: 'reviewer@example.com', name: 'Reviewer' },
+      user: { id: 'reviewer-id', email: 'reviewer@example.com', name: 'Reviewer' },
     };
 
     const trackedChangeComment = {
@@ -699,6 +701,7 @@ describe('comments-store', () => {
     await Promise.resolve();
     expect(linkedUserComment.resolveComment).toHaveBeenCalledTimes(1);
     expect(linkedUserComment.resolveComment).toHaveBeenCalledWith({
+      id: 'reviewer-id',
       email: 'reviewer@example.com',
       name: 'Reviewer',
       superdoc,

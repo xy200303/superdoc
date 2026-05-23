@@ -459,6 +459,10 @@ export const buildTrackedChangeMetaFromMark = (mark: PMMark, storyKey?: string):
     kind,
     id: deriveTrackedChangeId(kind, attrs),
   };
+  if (typeof attrs.overlapParentId === 'string' && attrs.overlapParentId) {
+    meta.overlapParentId = attrs.overlapParentId;
+    meta.relationship = 'child';
+  }
   if (typeof attrs.author === 'string' && attrs.author) {
     meta.author = attrs.author;
   }
@@ -502,6 +506,25 @@ export const selectTrackedChangeMeta = (
   return existing;
 };
 
+const trackedChangeLayerKey = (meta: TrackedChangeMeta): string => `${meta.kind}:${meta.id}`;
+
+const normalizeTrackedChangeLayers = (run: TextRun): TrackedChangeMeta[] => {
+  if (Array.isArray(run.trackedChanges) && run.trackedChanges.length > 0) {
+    return run.trackedChanges;
+  }
+  return run.trackedChange ? [run.trackedChange] : [];
+};
+
+const appendTrackedChangeLayer = (run: TextRun, meta: TrackedChangeMeta): void => {
+  const layers = normalizeTrackedChangeLayers(run);
+  const key = trackedChangeLayerKey(meta);
+  if (!layers.some((layer) => trackedChangeLayerKey(layer) === key)) {
+    layers.push(meta);
+  }
+  run.trackedChanges = layers;
+  run.trackedChange = selectTrackedChangeMeta(run.trackedChange, meta);
+};
+
 /**
  * Checks if two text runs have compatible tracked change metadata for merging.
  * Runs are compatible if they have the same kind and ID, or both have no metadata.
@@ -511,11 +534,13 @@ export const selectTrackedChangeMeta = (
  * @returns true if runs can be merged, false otherwise
  */
 export const trackedChangesCompatible = (a: TextRun, b: TextRun): boolean => {
-  const aMeta = a.trackedChange;
-  const bMeta = b.trackedChange;
-  if (!aMeta && !bMeta) return true;
-  if (!aMeta || !bMeta) return false;
-  return aMeta.kind === bMeta.kind && aMeta.id === bMeta.id;
+  const aLayers = normalizeTrackedChangeLayers(a);
+  const bLayers = normalizeTrackedChangeLayers(b);
+  if (aLayers.length !== bLayers.length) return false;
+  return aLayers.every((aMeta, index) => {
+    const bMeta = bLayers[index];
+    return Boolean(bMeta && aMeta.kind === bMeta.kind && aMeta.id === bMeta.id);
+  });
 };
 
 /**
@@ -532,6 +557,21 @@ export const collectTrackedChangeFromMarks = (marks?: PMMark[], storyKey?: strin
     if (!meta) return current;
     return selectTrackedChangeMeta(current, meta);
   }, undefined);
+};
+
+export const collectTrackedChangesFromMarks = (marks?: PMMark[], storyKey?: string): TrackedChangeMeta[] => {
+  if (!marks || !marks.length) return [];
+  const seen = new Set<string>();
+  const trackedChanges: TrackedChangeMeta[] = [];
+  marks.forEach((mark) => {
+    const meta = buildTrackedChangeMetaFromMark(mark, storyKey);
+    if (!meta) return;
+    const key = trackedChangeLayerKey(meta);
+    if (seen.has(key)) return;
+    seen.add(key);
+    trackedChanges.push(meta);
+  });
+  return trackedChanges;
 };
 
 /**
@@ -862,7 +902,7 @@ export const applyMarksToRun = (
           if (!isTabRun) {
             const tracked = buildTrackedChangeMetaFromMark(mark, storyKey);
             if (tracked) {
-              run.trackedChange = selectTrackedChangeMeta(run.trackedChange, tracked);
+              appendTrackedChangeLayer(run, tracked);
             }
           }
           break;

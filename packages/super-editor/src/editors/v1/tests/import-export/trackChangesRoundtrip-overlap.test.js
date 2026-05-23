@@ -20,8 +20,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { loadTestDataForEditorTests, initTestEditor } from '../helpers/helpers.js';
+import { Editor } from '@core/Editor.js';
 import DocxZipper from '@core/DocxZipper.js';
 import { parseXmlToJson } from '@converter/v2/docxHelper.js';
+import { TRACKED_CHANGE_SOURCE_ID_MAP_PROPERTY } from '@extensions/track-changes/review-model/word-id-allocator.js';
 
 const TRACK_NAMES = new Set(['w:ins', 'w:del']);
 const FORMAT_REVISION_NAMES = new Set(['w:rPrChange', 'w:pPrChange']);
@@ -323,6 +325,90 @@ describe('overlap export — allocator collision behavior', () => {
       }
     } finally {
       editor.destroy();
+    }
+  });
+
+  it('restores non-decimal sourceIds after Word-compatible export rewrites w:id', async () => {
+    const { docx, media, mediaFiles, fonts } = await loadTestDataForEditorTests('blank-doc.docx');
+    const { editor } = await initTestEditor({
+      content: docx,
+      media,
+      mediaFiles,
+      fonts,
+      isHeadless: true,
+      trackedChanges: {},
+    });
+    let reopened;
+
+    try {
+      const schema = editor.schema;
+      const originalSourceId = '77eb0a88-caef-402e-9329-ea504555afa3';
+      const replacementDoc = schema.nodeFromJSON({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'run',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'superdoc-origin',
+                    marks: [
+                      {
+                        type: 'trackInsert',
+                        attrs: {
+                          id: 'logical-superdoc-origin',
+                          sourceId: originalSourceId,
+                          author: 'Alice',
+                          authorEmail: 'alice@example.com',
+                          date: '2024-01-01T00:00:00Z',
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+      editor.dispatch(editor.state.tr.replaceWith(0, editor.state.doc.content.size, replacementDoc.content));
+
+      const exportedBuffer = await editor.exportDocx({ isFinalDoc: false });
+      const files = await loadExportedPackage(exportedBuffer);
+      const documentXmlEntry = files.find((f) => f.name === 'word/document.xml');
+      expect(documentXmlEntry.content).toContain('w:id="1"');
+      expect(documentXmlEntry.content).not.toContain(originalSourceId);
+
+      const customXmlEntry = files.find((f) => f.name === 'docProps/custom.xml');
+      expect(customXmlEntry.content).toContain(TRACKED_CHANGE_SOURCE_ID_MAP_PROPERTY);
+      expect(customXmlEntry.content).toContain(originalSourceId);
+
+      const [roundtripDocx, roundtripMedia, roundtripMediaFiles, roundtripFonts] = await Editor.loadXmlData(
+        exportedBuffer,
+        true,
+      );
+      ({ editor: reopened } = await initTestEditor({
+        content: roundtripDocx,
+        media: roundtripMedia,
+        mediaFiles: roundtripMediaFiles,
+        fonts: roundtripFonts,
+        isHeadless: true,
+        trackedChanges: {},
+      }));
+
+      const sourceIds = [];
+      reopened.state.doc.descendants((node) => {
+        for (const mark of node.marks ?? []) {
+          if (mark.type.name === 'trackInsert') sourceIds.push(mark.attrs.sourceId);
+        }
+      });
+      expect(sourceIds).toContain(originalSourceId);
+    } finally {
+      editor.destroy();
+      reopened?.destroy();
     }
   });
 });

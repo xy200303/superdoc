@@ -32,6 +32,10 @@ import { Slice, Fragment } from 'prosemirror-model';
  * @property {TrackedEditIntentUser} user
  * @property {string} date
  * @property {string} [replacementGroupHint]
+ * @property {boolean} [probeForDeletionSpan] When true, the compiler may
+ *   probe for an adjacent tracked-delete span and move the insertion to
+ *   after it. Single-step user replace turns this on; multi-step transactions
+ *   leave it off so each granular op lands at its own position.
  */
 
 /**
