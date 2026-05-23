@@ -260,6 +260,77 @@ describe('SuperDoc core', () => {
     expect(commentsStore.init).toHaveBeenCalledWith({});
   });
 
+  it('relays store exception payloads through the public exception event', async () => {
+    const { superdocStore } = createAppHarness();
+    const onException = vi.fn();
+
+    new SuperDoc({
+      selector: '#host',
+      document: 'https://example.com/doc.docx',
+      documents: [],
+      modules: { comments: {}, toolbar: {} },
+      onException,
+    });
+    await flushMicrotasks();
+
+    const handler = superdocStore.setExceptionHandler.mock.calls[0][0];
+    const payload = { error: 'raw store failure', document: null, stage: 'document-init' };
+    handler(payload);
+
+    expect(onException).toHaveBeenCalledWith(payload);
+  });
+
+  it('forwards raw content errors with document id and source file', async () => {
+    const { superdocStore } = createAppHarness();
+    const onContentError = vi.fn();
+    const sourceFile = new Blob(['docx'], { type: DOCX });
+
+    superdocStore.documents = [{ id: 'doc-1', data: sourceFile }];
+
+    const instance = new SuperDoc({
+      selector: '#host',
+      document: 'https://example.com/doc.docx',
+      documents: [],
+      modules: { comments: {}, toolbar: {} },
+      onContentError,
+      onException: vi.fn(),
+    });
+    await flushMicrotasks();
+
+    const error = 'raw editor failure';
+    const editor = { options: { documentId: 'doc-1' } };
+    instance.onContentError({ error, editor });
+
+    expect(onContentError).toHaveBeenCalledWith({
+      error,
+      editor,
+      documentId: 'doc-1',
+      file: sourceFile,
+    });
+  });
+
+  it('keeps toolbarGroups separate from toolbar group item mappings', async () => {
+    createAppHarness();
+
+    const instance = new SuperDoc({
+      selector: '#host',
+      document: 'https://example.com/doc.docx',
+      documents: [],
+      modules: {
+        comments: {},
+        toolbar: {
+          groups: { custom: ['bold', 'italic'] },
+        },
+      },
+      toolbarGroups: ['left', 'custom'],
+      onException: vi.fn(),
+    });
+    await flushMicrotasks();
+
+    expect(instance.toolbar.config.toolbarGroups).toEqual(['left', 'custom']);
+    expect(instance.toolbar.config.groups).toEqual({ custom: ['bold', 'italic'] });
+  });
+
   it('creates a default user when none is provided', async () => {
     createAppHarness();
 

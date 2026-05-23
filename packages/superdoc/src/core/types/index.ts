@@ -1287,6 +1287,63 @@ export interface SuperDocTelemetryConfig {
   licenseKey?: string;
 }
 
+/**
+ * Exception payload raised by the SuperDoc store during document
+ * initialization (empty entry, init failure, normalization error).
+ * Always carries `stage: 'document-init'` and the offending document
+ * config (`null`/`undefined` when the entry itself was empty).
+ *
+ * `error` is `unknown` because the catch path in `initializeDocuments`
+ * forwards the raw caught value (`catch (e) { emitException({ error: e,
+ * ... }) }`) and thrown values can be anything in JS. The other two
+ * emit sites construct `new Error(...)`, but consumers must narrow
+ * before reading `.message`.
+ */
+export interface SuperDocExceptionStorePayload {
+  error: unknown;
+  stage: 'document-init';
+  document: Document | null | undefined;
+}
+
+/**
+ * Exception payload raised when restoring SuperDoc state from a
+ * persisted source fails. Carries the document the runtime tried to
+ * restore.
+ */
+export interface SuperDocExceptionRestorePayload {
+  error: unknown;
+  document: Document;
+}
+
+/**
+ * Exception payload raised by the underlying editor lifecycle (load,
+ * encryption-prompt, command failures, etc.). `code` is set when the
+ * editor maps the failure to a known kind (e.g. `'password-required'`).
+ * `editor` is `Editor | null | undefined` because the password-prompt
+ * re-emit path forwards `originalException?.editor ?? null`, so
+ * consumers may receive `null` (not just `undefined`).
+ */
+export interface SuperDocExceptionEditorPayload {
+  error: unknown;
+  editor?: Editor | null;
+  code?: string;
+  documentId?: string | null;
+}
+
+/**
+ * Union of all `exception` event payloads SuperDoc emits at runtime.
+ * Consumers can narrow with `'stage' in payload` (store init) or
+ * `'code' in payload` (editor lifecycle).
+ *
+ * SD-2916 tracks a follow-up to normalize these to a single shape; the
+ * union exists today because three independent emit sites pre-date a
+ * shared error contract.
+ */
+export type SuperDocExceptionPayload =
+  | SuperDocExceptionStorePayload
+  | SuperDocExceptionRestorePayload
+  | SuperDocExceptionEditorPayload;
+
 export interface Config {
   /** The ID of the SuperDoc. */
   superdocId?: string;
@@ -1368,8 +1425,21 @@ export interface Config {
   onTransaction?: (params: EditorTransactionEvent) => void;
   /** Callback after an editor is destroyed. */
   onEditorDestroy?: () => void;
-  /** Callback when there is an error in the content. */
-  onContentError?: (params: { error: object; editor: Editor; documentId: string; file: File }) => void;
+  /**
+   * Callback when an editor reports a content error (parse failure, doc
+   * import error, etc.). `error` is widened to `unknown` because the
+   * super-editor side mostly normalizes to `Error` but some emitters
+   * (e.g. `insertContentAt`) forward the original caught value. `file`
+   * matches `Document.data` (`File | Blob | null | undefined`) since
+   * the document can be loaded from any of those shapes. `documentId`
+   * is guaranteed at runtime by `#initDocuments`.
+   */
+  onContentError?: (params: {
+    error: unknown;
+    editor: Editor;
+    documentId: string;
+    file: File | Blob | null | undefined;
+  }) => void;
   /** Callback when the SuperDoc is ready. */
   onReady?: (editor: { superdoc: SuperDoc }) => void;
   /** Callback when comments are updated. */
@@ -1386,8 +1456,13 @@ export interface Config {
   onCollaborationReady?: (params: { editor: Editor }) => void;
   /** Callback when document is updated. */
   onEditorUpdate?: (params: EditorUpdateEvent) => void;
-  /** Callback when an exception is thrown. */
-  onException?: (params: { error: Error; editor?: Editor | null; code?: string }) => void;
+  /**
+   * Callback when SuperDoc emits an `exception` event. The payload is a
+   * union of three runtime shapes (store init, restore failure, editor
+   * lifecycle). Narrow with `'stage' in params` (store init) or `'code'
+   * in params` (editor) before reading shape-specific fields.
+   */
+  onException?: (params: SuperDocExceptionPayload) => void;
   /** Callback when the comments list is rendered. */
   onCommentsListChange?: (params: { isRendered: boolean }) => void;
   /**

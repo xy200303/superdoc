@@ -188,12 +188,14 @@ const DEFAULT_AWARENESS_PALETTE = Object.freeze([
  * Union of the three current `exception` payload shapes (debt: should be
  * normalized to one shape in a follow-up). Consumers can narrow with
  * `'stage' in payload` (store init) or `'code' in payload` (Vue editor
- * lifecycle).
+ * lifecycle). The interfaces live in `./types/index.ts` so they can be
+ * referenced by both the JSDoc event registry below and the public
+ * `Config.onException` callback type.
  *
- * @typedef {{ error: Error, stage: 'document-init', document: Document | null | undefined }} SuperDocExceptionStorePayload
- * @typedef {{ error: unknown, document: Document }} SuperDocExceptionRestorePayload
- * @typedef {{ error: unknown, editor?: Editor, code?: string, documentId?: string | null }} SuperDocExceptionEditorPayload
- * @typedef {SuperDocExceptionStorePayload | SuperDocExceptionRestorePayload | SuperDocExceptionEditorPayload} SuperDocExceptionPayload
+ * @typedef {import('./types/index.js').SuperDocExceptionStorePayload} SuperDocExceptionStorePayload
+ * @typedef {import('./types/index.js').SuperDocExceptionRestorePayload} SuperDocExceptionRestorePayload
+ * @typedef {import('./types/index.js').SuperDocExceptionEditorPayload} SuperDocExceptionEditorPayload
+ * @typedef {import('./types/index.js').SuperDocExceptionPayload} SuperDocExceptionPayload
  */
 
 /**
@@ -788,7 +790,9 @@ export class SuperDoc extends EventEmitter {
     this.commentsStore = commentsStore;
     this.highContrastModeStore = highContrastModeStore;
     if (typeof this.superdocStore.setExceptionHandler === 'function') {
-      this.superdocStore.setExceptionHandler((/** @type {unknown} */ payload) => this.emit('exception', payload));
+      this.superdocStore.setExceptionHandler((/** @type {SuperDocExceptionStorePayload} */ payload) =>
+        this.emit('exception', payload),
+      );
     }
     this.superdocStore.init(this.config);
     const commentsModuleConfig = /** @type {InternalConfig} */ (this.config).modules.comments;
@@ -1321,8 +1325,13 @@ export class SuperDoc extends EventEmitter {
   }
 
   /**
-   * Triggered when there is an error in the content
-   * @param {{ error: Error, editor: Editor }} params
+   * Forward the editor's raw content-error to the consumer callback,
+   * enriching with documentId and the source file. `error` is widened
+   * to `unknown` because super-editor's emitters do not normalize to
+   * `Error` consistently (e.g. `insertContentAt` forwards the original
+   * caught value).
+   *
+   * @param {SuperDocContentErrorPayload} params
    */
   onContentError({ error, editor }) {
     const { documentId } = editor.options;
@@ -1336,7 +1345,17 @@ export class SuperDoc extends EventEmitter {
     // the consumer-supplied config over it (`{ ...this.config, ...config }`),
     // so an explicit `onContentError: undefined` can still strip the
     // default. The optional chain keeps the call safe in that case.
-    this.config.onContentError?.({ error, editor, documentId: doc.id, file: doc.data });
+    //
+    // `documentId` is `string` on the public callback (runtime-guaranteed
+    // by `#initDocuments`). `Document.id` is typed as optional, so cast
+    // at this dispatch site to express the runtime invariant without
+    // forcing a TS-only check in the hot error path.
+    this.config.onContentError?.({
+      error,
+      editor,
+      documentId: /** @type {string} */ (doc.id),
+      file: doc.data,
+    });
   }
 
   /**
@@ -1486,7 +1505,14 @@ export class SuperDoc extends EventEmitter {
     const config = {
       selector: this.toolbarElement || null,
       isDev: this.isDev || false,
-      toolbarGroups: this.config.modules?.toolbar?.groups || this.config.toolbarGroups,
+      // `Config.toolbarGroups` is the ordered list of group ids
+      // (`['left', 'center', 'right']`). `modules.toolbar.groups` is the
+      // separate `Record<string, string[]>` mapping group ids to item
+      // ids and flows through the `...moduleConfig` spread below.
+      // The earlier `groups || toolbarGroups` shorthand conflated the
+      // two shapes and silently widened the toolbar's group-ordering
+      // input to a record at runtime.
+      toolbarGroups: this.config.toolbarGroups,
       role: this.config.role,
       icons: this.config.modules?.toolbar?.icons || this.config.toolbarIcons,
       texts: this.config.modules?.toolbar?.texts || this.config.toolbarTexts,

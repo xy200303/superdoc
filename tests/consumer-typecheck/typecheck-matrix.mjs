@@ -445,6 +445,30 @@ const scenarios = [
     files: ['src/document-api-consumer.ts'],
     mustPass: true,
   },
+  // SD-673 Phase 4D: SuperDoc Config callback shapes. Pins
+  // `Config.onContentError` and `Config.onException` payload typings
+  // after they were widened to match runtime emit reality (error:
+  // unknown, file: File | Blob | null | undefined, exception union).
+  {
+    name: 'bundler / superdoc config callbacks (SD-673 Phase 4D)',
+    module: 'ESNext',
+    moduleResolution: 'bundler',
+    skipLibCheck: false,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/superdoc-config-callbacks.ts'],
+    mustPass: true,
+  },
+  {
+    name: 'node16 / superdoc config callbacks (SD-673 Phase 4D)',
+    module: 'Node16',
+    moduleResolution: 'node16',
+    skipLibCheck: false,
+    strict: true,
+    noPropertyAccessFromIndexSignature: true,
+    files: ['src/superdoc-config-callbacks.ts'],
+    mustPass: true,
+  },
   // SD-2892: full public-facing surface with skipLibCheck=false. These
   // scenarios pack SuperDoc, install it into the consumer fixture, and compile
   // every public consumer assertion under the resolution modes customers use.
