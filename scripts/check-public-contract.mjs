@@ -17,18 +17,32 @@
  *   3. deep-type-audit     - strict gate on the supported-root public
  *                            surface (must be 0 findings). Reuses the
  *                            install that stage 2 produced (no `--pack`).
+ *   4. package-shape       - publint + attw against the packed manifest
+ *                            (reuses the install from stage 2).
+ *   5. snapshots           - super-editor / legacy / root no-growth
+ *                            snapshots (reuses the install).
+ *   6. closure             - root-classification closure gate:
+ *                            no supported-root/legacy-root export
+ *                            references an internal-candidate type.
  *
- * Matrix runs BEFORE audit on purpose: matrix packs + installs the
- * tarball once, and the audit then reuses that install. Without this
- * order the audit would `--pack` separately and double the work.
+ * Matrix runs BEFORE stages 3-6 on purpose: it packs `superdoc.tgz`
+ * and installs the tarball into the consumer fixture once. Stages 3,
+ * 5, and 6 (deep-type-audit, snapshots, closure) reuse the installed
+ * fixture; stage 4 (package-shape-gate) reuses the packed tarball
+ * directly. Without this ordering each downstream stage would
+ * `--pack` separately and multiply the work.
  *
  * Local usage:
- *   pnpm check:public-contract
+ *   pnpm check:public           (umbrella, runs SuperDoc + Document API)
+ *   pnpm check:public:superdoc  (SuperDoc only, this script)
  *
  * CI usage (Build step already ran):
- *   pnpm check:public-contract --skip-build
+ *   pnpm check:public:superdoc --skip-build
  *
  * SD-3256 Phase 1 (initial wrapper) / SD-673 Phase 1 (CI wiring).
+ * Extended in the typecheck-wrapper consolidation PR to subsume the
+ * package-shape / snapshots / closure steps that release-superdoc.yml,
+ * release-stable.yml, and ci-superdoc.yml previously ran separately.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -69,6 +83,33 @@ const stages = [
     blurb:
       'Strict gate on the supported-root public surface (must be 0 findings). ' +
       'Reuses the install produced by typecheck-matrix.',
+  },
+  {
+    name: 'package-shape-gate',
+    cwd: resolve(REPO_ROOT, 'tests/consumer-typecheck'),
+    cmd: 'node',
+    args: ['package-shape-gate.mjs'],
+    blurb:
+      'External npm-package linters (publint + attw) against the packed manifest. ' +
+      'Reuses the tarball produced by typecheck-matrix (not the installed fixture).',
+  },
+  {
+    name: 'snapshot --all --check',
+    cwd: resolve(REPO_ROOT, 'tests/consumer-typecheck'),
+    cmd: 'node',
+    args: ['snapshot.mjs', '--all', '--check'],
+    blurb:
+      'No-growth snapshots for super-editor / legacy / root export inventories. ' +
+      'Run with `node snapshot.mjs --family <name> --write` to regenerate intentionally.',
+  },
+  {
+    name: 'check-root-classification-closure',
+    cwd: resolve(REPO_ROOT, 'tests/consumer-typecheck'),
+    cmd: 'node',
+    args: ['check-root-classification-closure.mjs'],
+    blurb:
+      'Closure gate: no supported-root or legacy-root export references an ' +
+      'internal-candidate type in its public declared shape (SD-3212 A1b).',
   },
 ];
 

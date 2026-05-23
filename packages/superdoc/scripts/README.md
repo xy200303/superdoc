@@ -121,11 +121,16 @@ what an actual consumer would see — not the workspace source.
 | `package-shape-gate.mjs` | External package-shape linters (publint + attw) against the packed tarball. | Catches condition ordering, masquerading exports, missing field declarations. |
 | `check-root-classification-closure.mjs` | Asserts no `supported-root` or `legacy-root` export references an `internal-candidate` symbol in its public declared type. | Closure rule from SD-3212. |
 
-`check:public:superdoc` runs `typecheck-matrix` and `deep-type-audit`
-directly. `package-shape-gate`, `snapshot --all --check`, and
-`check-root-classification-closure` currently run as separate CI steps —
-folding them into `check:public:superdoc` is tracked as a follow-up so
-release workflows can call one command without losing coverage.
+`check:public:superdoc` runs all six in order. `typecheck-matrix` packs
+`superdoc.tgz` and installs it into the consumer fixture. The rest
+reuse what matrix produced: `deep-type-audit`, `snapshot --all
+--check`, and `check-root-classification-closure` read from the
+installed fixture in `node_modules/superdoc/`; `package-shape-gate`
+runs `publint` / `attw` against the packed tarball at
+`packages/superdoc/superdoc.tgz` directly. CI (`ci-superdoc.yml`) and
+release workflows (`release-superdoc.yml`, `release-stable.yml`) call
+`pnpm check:public:superdoc --skip-build` directly — no duplicated step
+lists.
 
 ---
 
@@ -178,14 +183,17 @@ packages/document-api/src/contract/operation-definitions.ts
 
 ## CI vs local
 
-- **`ci-superdoc.yml`** runs `pnpm check:public-contract --skip-build` after
-  its own Build step. This is the single command for the SuperDoc public
-  surface in CI.
-- **`release-superdoc.yml`** currently runs the consumer-typecheck matrix,
-  deep-type audit, package-shape gate, snapshot check, and classification
-  closure as separate steps. Migrating to `check:public:superdoc` once that
-  command covers all the gates is tracked separately.
+All three SuperDoc lanes call the same wrapper:
+
+- **`ci-superdoc.yml`** (PR CI) — `pnpm check:public:superdoc --skip-build` after the Build step.
+- **`release-superdoc.yml`** (preview/dev release) — same.
+- **`release-stable.yml`** (stable release) — same.
+
+The wrapper enforces every SuperDoc public-surface gate in one place.
+A change to the validation chain (adding a stage, reordering, renaming)
+lands in `scripts/check-public-contract.mjs` and propagates to all
+three lanes automatically.
 
 Local pre-commit: just run `pnpm check:public`. If anything fails, the
 failure message tells you which script and (for `check:public:docapi`)
-which command to run to regenerate stale artifacts.
+which command to run to regenerate missing or stale artifacts.

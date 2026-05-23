@@ -71,10 +71,10 @@ Do not hand-edit `COMMAND_CATALOG`, `OPERATION_MEMBER_PATH_MAP`, `OPERATION_REFE
 - `pnpm build` - build all packages
 - `pnpm test` - unit tests
 - `pnpm dev` - dev server from `examples/`
-- `pnpm check:types` - raw TS compile across all referenced projects (alias of `pnpm run type-check`). Does NOT run the public-interface chain.
-- `pnpm check:public` - **canonical pre-merge command for typed public surfaces.** Validates both `superdoc` (vite build + postbuild chain + consumer typecheck matrix + deep-type audit) and Document API (contract parity + output staleness + examples + overview). ~5 min. Non-mutating. Combines `check:public:superdoc` + `check:public:docapi`.
-- `pnpm check:public:superdoc` - SuperDoc public package surface only (alias of `check:public-contract`).
-- `pnpm check:public:docapi` - Document API public surface only (alias of `docapi:check`). Requires generated artifacts to be current; if it fails on staleness, run `pnpm generate:docapi`.
+- `pnpm check:types` - raw TS compile across all referenced projects (`tsc -b tsconfig.references.json`). Does NOT run the public-interface chain. Legacy alias: `pnpm run type-check`.
+- `pnpm check:public` - **canonical pre-merge command for typed public surfaces.** Validates both `superdoc` (vite build + postbuild chain + consumer typecheck matrix + deep-type audit + package-shape + snapshots + classification closure) and Document API (contract parity + output staleness + examples + overview). ~5 min. Non-mutating. Combines `check:public:superdoc` + `check:public:docapi`.
+- `pnpm check:public:superdoc` - SuperDoc public package surface only. Wraps six stages: build + matrix + deep-type audit + package-shape + snapshots + closure. Legacy alias: `pnpm run check:public-contract`.
+- `pnpm check:public:docapi` - Document API public surface only. Requires generated artifacts to be current; if it fails on missing files, run `pnpm generate:docapi`. Legacy alias: `pnpm run docapi:check`.
 - `pnpm generate:docapi` - regenerate Document API outputs after editing the contract (alias of `docapi:sync`). Writes gitignored generated artifacts under the Document API package. Run before `check:public:docapi` if it fails on missing files.
 - `pnpm generate:all` - regenerate schemas, SDK clients, tool catalogs, reference docs.
 - `pnpm report:public:superdoc` - print public-contract tier metadata (supported / legacy / asset / deprecated). Read-only, not a gate. Source of truth: `packages/superdoc/scripts/type-surface.config.cjs`.
