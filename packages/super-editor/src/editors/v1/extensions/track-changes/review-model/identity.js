@@ -92,6 +92,28 @@ const hasImportedAuthorConflict = ({ currentUser, change }) => {
   return true;
 };
 
+const hasImportedInsertionProvenance = (attrs) => {
+  const sourceId = attrs?.sourceId;
+  if (sourceId !== undefined && sourceId !== null && String(sourceId).trim()) {
+    return true;
+  }
+
+  if (normalizeImportedAuthorName(attrs?.importedAuthor)) {
+    return true;
+  }
+
+  const sourceIds = attrs?.sourceIds;
+  if (typeof sourceIds === 'string') {
+    const trimmed = sourceIds.trim();
+    return Boolean(trimmed && trimmed !== '{}' && trimmed !== 'null');
+  }
+  if (sourceIds && typeof sourceIds === 'object' && !Array.isArray(sourceIds)) {
+    return Object.keys(sourceIds).length > 0;
+  }
+
+  return false;
+};
+
 /**
  * @typedef {(
  *   | 'same-user'
@@ -196,6 +218,8 @@ export const shouldCollapseNoEmailInsertion = ({ currentUser, insertionAttrs }) 
 
   const authorEmail = normalizeEmail(insertionAttrs?.authorEmail);
   if (authorEmail) return false;
+
+  if (!hasImportedInsertionProvenance(insertionAttrs)) return false;
 
   const authorName =
     normalizeName(insertionAttrs?.author) || normalizeImportedAuthorName(insertionAttrs?.importedAuthor);

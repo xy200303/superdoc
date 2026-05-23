@@ -6,6 +6,7 @@ import {
   classifyOwnership,
   isSameUserHighConfidence,
   matchesSameUserRefinement,
+  shouldCollapseNoEmailInsertion,
 } from './identity.js';
 
 describe('review-model/identity', () => {
@@ -167,6 +168,22 @@ describe('review-model/identity', () => {
             hasEmail: false,
             importedAuthor: 'Mallory (imported)',
           },
+        }),
+      ).toBe(false);
+    });
+
+    it('only collapses no-email insertions through imported provenance', () => {
+      expect(
+        shouldCollapseNoEmailInsertion({
+          currentUser: { name: '', email: '' },
+          insertionAttrs: { author: '', authorEmail: '', sourceId: '1' },
+        }),
+      ).toBe(true);
+
+      expect(
+        shouldCollapseNoEmailInsertion({
+          currentUser: { name: '', email: '' },
+          insertionAttrs: { author: '', authorEmail: '', sourceId: '' },
         }),
       ).toBe(false);
     });

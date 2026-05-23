@@ -2911,6 +2911,9 @@ export class Editor extends EventEmitter<EditorEventMap> {
       const isTrackChangesActive = trackChangesState?.isTrackChangesActive ?? false;
       const skipTrackChanges = transactionToApply.getMeta('skipTrackChanges') === true;
       const protectsExistingTrackedReviewState = transactionTouchesTrackedReviewState(prevState, transactionToApply);
+      if (protectsExistingTrackedReviewState && skipTrackChanges) {
+        transactionToApply.setMeta('protectTrackedReviewState', true);
+      }
 
       const shouldTrack =
         ((isTrackChangesActive || forceTrackChanges) && !skipTrackChanges) || protectsExistingTrackedReviewState;
@@ -2918,11 +2921,12 @@ export class Editor extends EventEmitter<EditorEventMap> {
         throw new Error('forceTrackChanges requires a user to be configured on the editor instance.');
       }
 
+      const trackedUser = this.options.user ?? {};
       transactionToApply = shouldTrack
         ? trackedTransaction({
             tr: transactionToApply,
             state: prevState,
-            user: this.options.user!,
+            user: trackedUser,
             replacements: this.options.trackedChanges?.replacements === 'independent' ? 'independent' : 'paired',
           })
         : transactionToApply;

@@ -276,6 +276,110 @@ describe('Editor dispatch tracked-change meta', () => {
     );
   });
 
+  it('protects anonymous live tracked insertion from direct delete without a configured editor user', () => {
+    ({ editor } = initTestEditor({
+      mode: 'text',
+      content: '<p></p>',
+      useImmediateSetTimeout: false,
+    }));
+    setDocumentWithTrackedInsertion(editor, { author: { name: '', email: '' }, id: FOREIGN_INSERT_ID });
+
+    const trackState = TrackChangesBasePluginKey.getState(editor.state);
+    expect(trackState?.isTrackChangesActive ?? false).toBe(false);
+
+    deleteText(editor, INSERTED_TAIL);
+
+    expect(editor.state.doc.textContent).toContain(INSERTED_TEXT);
+    expect(textForMarkId(editor, TrackInsertMarkName, FOREIGN_INSERT_ID)).toBe(INSERTED_TEXT);
+
+    const childDeletion = markEntries(editor, TrackDeleteMarkName).find(({ text }) => text === INSERTED_TAIL);
+    expect(childDeletion?.mark.attrs).toEqual(
+      expect.objectContaining({
+        author: '',
+        authorEmail: '',
+        overlapParentId: FOREIGN_INSERT_ID,
+      }),
+    );
+  });
+
+  it('protects anonymous live tracked insertion from document-api direct delete', () => {
+    ({ editor } = initTestEditor({
+      mode: 'text',
+      content: '<p></p>',
+      useImmediateSetTimeout: false,
+    }));
+    setDocumentWithTrackedInsertion(editor, { author: { name: '', email: '' }, id: FOREIGN_INSERT_ID });
+
+    const receipt = editor.doc.delete({ ref: getFirstMatchRef(editor, INSERTED_TAIL) }, { changeMode: 'direct' });
+
+    expect(receipt.success).toBe(true);
+    expect(editor.state.doc.textContent).toContain(INSERTED_TEXT);
+    expect(textForMarkId(editor, TrackInsertMarkName, FOREIGN_INSERT_ID)).toBe(INSERTED_TEXT);
+
+    const childDeletion = markEntries(editor, TrackDeleteMarkName).find(({ text }) => text === INSERTED_TAIL);
+    expect(childDeletion?.mark.attrs).toEqual(
+      expect.objectContaining({
+        author: '',
+        authorEmail: '',
+        overlapParentId: FOREIGN_INSERT_ID,
+      }),
+    );
+  });
+
+  it('protects tracked insertion created by document-api insert from document-api direct delete', () => {
+    ({ editor } = initTestEditor({
+      mode: 'text',
+      content: '<p></p>',
+      user: { id: 'cli', name: 'CLI' },
+      useImmediateSetTimeout: false,
+    }));
+
+    expect(editor.doc.trackChanges.list().total).toBe(0);
+    expect(editor.doc.comments.list().total).toBe(0);
+
+    const insertReceipt = editor.doc.insert({ value: 'live-review-comment' }, { changeMode: 'tracked' });
+    expect(insertReceipt.success).toBe(true);
+
+    const insertMark = markEntries(editor, TrackInsertMarkName).find(({ text }) => text === 'live-review-comment');
+    expect(insertMark?.mark.attrs).toEqual(
+      expect.objectContaining({
+        author: 'CLI',
+        authorId: 'cli',
+        authorEmail: '',
+      }),
+    );
+
+    const deleteReceipt = editor.doc.delete({ ref: getFirstMatchRef(editor, 'review') }, { changeMode: 'direct' });
+
+    expect(deleteReceipt.success).toBe(true);
+    expect(editor.state.doc.textContent).toContain('live-review-comment');
+
+    expect(textForMarkId(editor, TrackInsertMarkName, insertMark?.mark.attrs.id)).toBe('live-review-comment');
+
+    const childDeletion = markEntries(editor, TrackDeleteMarkName).find(({ text }) => text === 'review');
+    expect(childDeletion?.mark.attrs).toEqual(
+      expect.objectContaining({
+        author: 'CLI',
+        authorId: 'cli',
+        authorEmail: '',
+        overlapParentId: insertMark?.mark.attrs.id,
+      }),
+    );
+
+    const trackedChanges = editor.doc.trackChanges.list();
+    expect(trackedChanges.total).toBe(2);
+    expect(trackedChanges.items.map((item) => item.raw?.type ?? item.type).sort()).toEqual(['delete', 'insert']);
+
+    const comments = editor.doc.comments.list();
+    expect(comments.total).toBe(2);
+    expect(comments.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ trackedChangeType: 'insert', trackedChangeText: 'live-review-comment' }),
+        expect.objectContaining({ trackedChangeType: 'delete', deletedText: 'review' }),
+      ]),
+    );
+  });
+
   it('protects another user tracked insertion from direct replace while local track mode is off', () => {
     ({ editor } = initTestEditor({
       mode: 'text',

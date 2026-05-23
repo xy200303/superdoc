@@ -560,7 +560,9 @@ const applyTrackedDelete = (
         change: getChangeAuthorIdentity(segmentAtPos?.attrs ?? insertMark.attrs),
       });
       const ownership = isSameUserHighConfidence(classification) ? 'same-user' : 'different-user';
-      if (ownership === 'same-user' || isImportedOwnInsertion(insertMark)) {
+      const shouldCollapseOwnInsertion =
+        !ctx.intent.preserveExistingReviewState && (ownership === 'same-user' || isImportedOwnInsertion(insertMark));
+      if (shouldCollapseOwnInsertion) {
         // Own insertion → collapse (remove proposed content).
         ops.push({ kind: 'collapse', from: segFrom, to: segTo, changeId: insertMark.attrs.id });
         return;
@@ -722,7 +724,7 @@ const compileTextReplace = (ctx, intent) => {
   // that inserted side. Rejecting the original insertion must still remove
   // all proposed content, including the replacement text.
   const ownInsertedTarget = getSingleFullyCoveringOwnInsertedSegment(ctx, segments, intent.from, intent.to);
-  if (ownInsertedTarget) {
+  if (ownInsertedTarget && !intent.preserveExistingReviewState) {
     const deleteResult = applyTrackedDelete(ctx, intent.from, intent.to, {
       replacementGroupId: '',
       replacementSideId: '',

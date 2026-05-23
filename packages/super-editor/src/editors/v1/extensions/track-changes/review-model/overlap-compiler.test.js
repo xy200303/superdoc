@@ -429,7 +429,12 @@ describe('overlap-compiler: text-delete', () => {
     const parentId = 'ins-unattributed';
     const { state } = stateFromTrackedSpans({
       schema,
-      spans: [{ text: 'draft', marks: [insertMark({ id: parentId, author: '', authorEmail: '', date: FIXED_DATE })] }],
+      spans: [
+        {
+          text: 'draft',
+          marks: [insertMark({ id: parentId, author: '', authorEmail: '', sourceId: '1', date: FIXED_DATE })],
+        },
+      ],
     });
     const intent = makeTextDeleteIntent({ from: 1, to: 6, user: BOB, date: FIXED_DATE, source: 'document-api' });
     const result = runCompile({ state, intent });
@@ -438,6 +443,42 @@ describe('overlap-compiler: text-delete', () => {
     const graph = buildReviewGraph({ state: { doc: result.tr.doc } });
     expect(graph.changes.size).toBe(0);
     expect(result.removedChangeIds).toEqual([parentId]);
+  });
+
+  it('creates a child deletion inside a live anonymous no-email insertion', () => {
+    const parentId = 'ins-live-anonymous';
+    const { state } = stateFromTrackedSpans({
+      schema,
+      spans: [
+        {
+          text: 'live-review-comment',
+          marks: [insertMark({ id: parentId, author: '', authorEmail: '', sourceId: '', date: FIXED_DATE })],
+        },
+      ],
+    });
+    const intent = makeTextDeleteIntent({
+      from: 6,
+      to: 12,
+      user: { name: '', email: '' },
+      date: FIXED_DATE,
+      source: 'document-api',
+    });
+    const result = runCompile({ state, intent });
+    expect(result.ok).toBe(true);
+    expect(textOf(result.tr)).toBe('live-review-comment');
+
+    const graph = buildReviewGraph({ state: { doc: result.tr.doc } });
+    expect(graph.changes.size).toBe(2);
+    const parent = graph.changes.get(parentId);
+    expect(parent).toBeDefined();
+    expect(parent.type).toBe(CanonicalChangeType.Insertion);
+    expect(parent.insertedSegments.map((segment) => segment.text).join('')).toBe('live-review-comment');
+
+    const child = Array.from(graph.changes.values()).find((change) => change.id !== parentId);
+    expect(child).toBeDefined();
+    expect(child.type).toBe(CanonicalChangeType.Deletion);
+    expect(child.deletedSegments[0].text).toBe('review');
+    expect(child.deletedSegments[0].attrs.overlapParentId).toBe(parentId);
   });
 
   it('no-ops when deleting inside own deletion', () => {

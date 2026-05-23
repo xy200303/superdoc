@@ -348,7 +348,12 @@ export const trackedTransaction = ({ tr, state, user, replacements = 'paired' })
   const isProgrammaticInput = tr.getMeta('inputType') === 'programmatic';
   const ySyncMeta = tr.getMeta(ySyncPluginKey);
   const pendingDeadKeyPlaceholder = TrackChangesBasePluginKey.getState(state)?.pendingDeadKeyPlaceholder ?? null;
-  const allowedMeta = new Set([...onlyInputTypeMeta, ySyncPluginKey.key, 'forceTrackChanges']);
+  const allowedMeta = new Set([
+    ...onlyInputTypeMeta,
+    ySyncPluginKey.key,
+    'forceTrackChanges',
+    'protectTrackedReviewState',
+  ]);
   const hasDisallowedMeta = tr.meta && Object.keys(tr.meta).some((meta) => !allowedMeta.has(meta));
 
   if (

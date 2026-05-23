@@ -36,6 +36,10 @@ import { Slice, Fragment } from 'prosemirror-model';
  *   probe for an adjacent tracked-delete span and move the insertion to
  *   after it. Single-step user replace turns this on; multi-step transactions
  *   leave it off so each granular op lands at its own position.
+ * @property {boolean} [preserveExistingReviewState] When true, the compiler
+ *   must not collapse/refine existing tracked review marks even if the
+ *   current user owns them. Used by explicit direct mutations that are
+ *   re-routed through tracking only to protect existing review state.
  */
 
 /**
@@ -102,10 +106,20 @@ export const toSliceContent = (schema, content) => {
  *   date: string,
  *   source: EditIntentSource,
  *   replacementGroupHint?: string,
+ *   preserveExistingReviewState?: boolean,
  * }} input
  * @returns {TrackedEditIntent}
  */
-export const makeTextInsertIntent = ({ at, content, schema, user, date, source, replacementGroupHint }) => {
+export const makeTextInsertIntent = ({
+  at,
+  content,
+  schema,
+  user,
+  date,
+  source,
+  replacementGroupHint,
+  preserveExistingReviewState,
+}) => {
   if (!isFiniteNonNeg(at)) {
     throw new Error('makeTextInsertIntent: `at` must be a non-negative finite number');
   }
@@ -119,6 +133,7 @@ export const makeTextInsertIntent = ({ at, content, schema, user, date, source, 
     date,
     source,
     ...(replacementGroupHint ? { replacementGroupHint } : {}),
+    ...(preserveExistingReviewState ? { preserveExistingReviewState: true } : {}),
   };
 };
 
@@ -132,10 +147,19 @@ export const makeTextInsertIntent = ({ at, content, schema, user, date, source, 
  *   date: string,
  *   source: EditIntentSource,
  *   replacementGroupHint?: string,
+ *   preserveExistingReviewState?: boolean,
  * }} input
  * @returns {TrackedEditIntent}
  */
-export const makeTextDeleteIntent = ({ from, to, user, date, source, replacementGroupHint }) => {
+export const makeTextDeleteIntent = ({
+  from,
+  to,
+  user,
+  date,
+  source,
+  replacementGroupHint,
+  preserveExistingReviewState,
+}) => {
   if (!isFiniteNonNeg(from) || !isFiniteNonNeg(to)) {
     throw new Error('makeTextDeleteIntent: `from`/`to` must be non-negative finite numbers');
   }
@@ -148,6 +172,7 @@ export const makeTextDeleteIntent = ({ from, to, user, date, source, replacement
     date,
     source,
     ...(replacementGroupHint ? { replacementGroupHint } : {}),
+    ...(preserveExistingReviewState ? { preserveExistingReviewState: true } : {}),
   };
 };
 
@@ -164,6 +189,7 @@ export const makeTextDeleteIntent = ({ from, to, user, date, source, replacement
  *   date: string,
  *   source: EditIntentSource,
  *   replacementGroupHint?: string,
+ *   preserveExistingReviewState?: boolean,
  * }} input
  * @returns {TrackedEditIntent}
  */
@@ -177,6 +203,7 @@ export const makeTextReplaceIntent = ({
   date,
   source,
   replacementGroupHint,
+  preserveExistingReviewState,
 }) => {
   if (!isFiniteNonNeg(from) || !isFiniteNonNeg(to)) {
     throw new Error('makeTextReplaceIntent: `from`/`to` must be non-negative finite numbers');
@@ -194,6 +221,7 @@ export const makeTextReplaceIntent = ({
     date,
     source,
     ...(replacementGroupHint ? { replacementGroupHint } : {}),
+    ...(preserveExistingReviewState ? { preserveExistingReviewState: true } : {}),
   };
 };
 

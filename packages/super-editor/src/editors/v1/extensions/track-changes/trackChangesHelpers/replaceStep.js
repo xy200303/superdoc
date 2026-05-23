@@ -263,10 +263,25 @@ const tryCompileStep = ({
   // type; mixed (text-replace) carries the original slice.
   let intent;
   try {
+    const preserveExistingReviewState = tr.getMeta('protectTrackedReviewState') === true;
     if (step.from === step.to && step.slice.content.size > 0) {
-      intent = makeTextInsertIntent({ at: step.from, content: step.slice, user, date, source: 'native' });
+      intent = makeTextInsertIntent({
+        at: step.from,
+        content: step.slice,
+        user,
+        date,
+        source: 'native',
+        preserveExistingReviewState,
+      });
     } else if (step.from !== step.to && step.slice.content.size === 0) {
-      intent = makeTextDeleteIntent({ from: step.from, to: step.to, user, date, source: 'native' });
+      intent = makeTextDeleteIntent({
+        from: step.from,
+        to: step.to,
+        user,
+        date,
+        source: 'native',
+        preserveExistingReviewState,
+      });
     } else if (step.from !== step.to && step.slice.content.size > 0) {
       intent = makeTextReplaceIntent({
         from: step.from,
@@ -276,6 +291,7 @@ const tryCompileStep = ({
         user,
         date,
         source: 'native',
+        preserveExistingReviewState,
       });
       // Single-step user actions (text replace from one ReplaceStep) probe
       // for adjacent tracked-delete spans so insertion lands past the
