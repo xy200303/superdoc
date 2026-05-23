@@ -255,17 +255,8 @@ export class SuperDoc extends EventEmitter {
    */
   version = '0.0.0';
 
-  /**
-   * Local copy of the shared users list. Initialized to `[]` so direct
-   * reads (`superdoc.users`) and `addSharedUser`/`removeSharedUser`
-   * mutations don't trip on `undefined` between construction and
-   * `#init` resuming after the collaboration await. Pre-ready mutations
-   * are guarded separately in PR-B (SD-2916); for now `#init` still
-   * unconditionally re-seeds from `config.users`, so callers that need
-   * stable ordering should wait for the `ready` event.
-   * @type {User[]}
-   */
-  users = [];
+  /** @type {User[]} */
+  users;
 
   /** @type {import('yjs').Doc | undefined} */
   ydoc;

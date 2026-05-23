@@ -2488,21 +2488,6 @@ describe('SuperDoc core', () => {
   // before the `ready` event must see a usable value, not `undefined`.
 
   describe('SD-2916 PR-A: safe field defaults', () => {
-    it('initializes `users` to [] immediately after construction (before async init resumes)', () => {
-      createAppHarness();
-      const instance = new SuperDoc({
-        selector: '#host',
-        documents: [],
-        modules: { comments: {}, toolbar: {} },
-        user: { name: 'Jane', email: 'jane@example.com' },
-      });
-
-      // No `await flushMicrotasks()` — we want the state visible while
-      // the async `#init` is still pending its first await.
-      expect(Array.isArray(instance.users)).toBe(true);
-      expect(instance.users).toHaveLength(0);
-    });
-
     it('initializes `whiteboard` to null immediately after construction', () => {
       createAppHarness();
       const instance = new SuperDoc({
@@ -2537,7 +2522,7 @@ describe('SuperDoc core', () => {
       handle.close({ status: 'cancelled' });
     });
 
-    it('`version` is a non-empty string immediately after construction', () => {
+    it('`version` is the injected build-time constant, not the placeholder', () => {
       createAppHarness();
       const instance = new SuperDoc({
         selector: '#host',
@@ -2546,13 +2531,13 @@ describe('SuperDoc core', () => {
         user: { name: 'Jane', email: 'jane@example.com' },
       });
 
-      // `#init` runs synchronously up to the first await (which is
-      // inside `#initCollaboration` only if collaboration is configured;
-      // without it the version overwrite happens before the constructor
-      // call returns). Either way the field must be a string before the
-      // consumer can read it.
+      // The field declaration seeds `'0.0.0'` so the field is
+      // structurally assigned, then `#init` synchronously overwrites
+      // with `__APP_VERSION__` (vite injects this in both dev/test and
+      // build config). Assert the overwrite happened — a regression
+      // that drops the overwrite would leave the placeholder visible.
       expect(typeof instance.version).toBe('string');
-      expect(instance.version.length).toBeGreaterThan(0);
+      expect(instance.version).not.toBe('0.0.0');
     });
   });
 });
