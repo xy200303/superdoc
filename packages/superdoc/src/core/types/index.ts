@@ -1319,10 +1319,13 @@ export interface SuperDocExceptionRestorePayload {
  * Exception payload raised by the underlying editor lifecycle (load,
  * encryption-prompt, command failures, etc.). `code` is set when the
  * editor maps the failure to a known kind (e.g. `'password-required'`).
+ * `editor` is `Editor | null | undefined` because the password-prompt
+ * re-emit path forwards `originalException?.editor ?? null`, so
+ * consumers may receive `null` (not just `undefined`).
  */
 export interface SuperDocExceptionEditorPayload {
   error: unknown;
-  editor?: Editor;
+  editor?: Editor | null;
   code?: string;
   documentId?: string | null;
 }

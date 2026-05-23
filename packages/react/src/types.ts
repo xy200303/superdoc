@@ -86,19 +86,14 @@ export interface SuperDocTransactionEvent {
 }
 
 /**
- * Event passed to onContentError callback. `error` is `unknown` because
- * super-editor's content-error emit forwards the original caught value
- * (not always `Error`); `file` matches `Document.data`
- * (`File | Blob | null | undefined`) since the document can be loaded
- * from any of those shapes. Mirrors the core `Config.onContentError`
- * contract.
+ * Event passed to onContentError callback. Re-derived from the core
+ * `SuperDocConfig['onContentError']` parameter so the React wrapper
+ * cannot drift from the core contract: any widening or tightening
+ * upstream surfaces here automatically. See the core
+ * `Config.onContentError` JSDoc for the field semantics
+ * (`error: unknown`, `file: File | Blob | null | undefined`).
  */
-export interface SuperDocContentErrorEvent {
-  error: unknown;
-  editor: Editor;
-  documentId: string;
-  file: File | Blob | null | undefined;
-}
+export type SuperDocContentErrorEvent = Parameters<NonNullable<SuperDocConfig['onContentError']>>[0];
 
 /**
  * Event passed to onException callback. Re-exports the core union so
