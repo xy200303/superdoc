@@ -160,7 +160,7 @@ export interface RuntimeDocument extends Document {
    * silently replacing whatever was passed. SD-2872 removed this from
    * the public `Document` interface so consumers stop trying to use it
    * as a stable per-document override; it lives on `RuntimeDocument`
-   * only so internal SuperDoc.js callsites can type the assignment.
+   * only so internal SuperDoc callsites can type the assignment.
    */
   role?: 'editor' | 'viewer' | 'suggester';
   /**
@@ -183,7 +183,7 @@ export interface RuntimeDocument extends Document {
   getPresentationEditor?: () => SuperEditorPresentationEditor | null | undefined;
   /**
    * Runtime-only flag mirrored from `Config.rulers` per document by the
-   * Pinia store. SuperDoc.js writes this on each document during the
+   * Pinia store. SuperDoc writes this on each document during the
    * setShowRulers flow; not part of consumer-supplied `Document`.
    */
   rulers?: boolean;
@@ -1587,7 +1587,7 @@ export interface Config {
  * call sites cast `this.config` to this type so they can access these
  * invariants without per-site null guards.
  *
- * Use this from internal SuperDoc.js callsites that need the augmented shape
+ * Use this from internal SuperDoc callsites that need the augmented shape
  * (e.g. `/** @type {InternalConfig} *\/ (this.config).socket = ...`).
  */
 export interface InternalConfig extends Config {
