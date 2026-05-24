@@ -298,6 +298,25 @@ const extractDropCapRunFromParagraph = (para: PMNode, converterContext?: Convert
 };
 
 /**
+ * Word ties the auto-generated list marker's visibility to the first inline run
+ * of the paragraph: if the first run carries `w:vanish`, the marker is hidden
+ * along with that leading content; otherwise the marker stays visible — even
+ * when `w:vanish`/`w:specVanish` sit on the paragraph-mark rPr (those flags
+ * only hide the paragraph mark glyph per ECMA-376 §17.3.2.36 / §17.3.2.41).
+ * SD-3269 follow-up.
+ */
+const isFirstInlineRunVanished = (para: PMNode): boolean => {
+  const content = para.content;
+  if (!Array.isArray(content) || content.length === 0) return false;
+  for (const node of content) {
+    if (!node || node.type !== 'run') continue;
+    const runProps = (node.attrs?.runProperties ?? {}) as RunProperties;
+    return runProps.vanish === true;
+  }
+  return false;
+};
+
+/**
  * Compute paragraph attributes from PM node, resolving styles and handling BiDi text.
  * This is the main function for converting PM paragraph attributes to layout engine format.
  */
@@ -402,6 +421,13 @@ export const computeParagraphAttrs = (
     );
 
     const markerRunAttrs = computeRunAttrs(markerRunProperties, converterContext);
+
+    // SD-3269: Word hides the auto-generated list marker when the first inline
+    // run is vanished. The numbering-definition rPr can still force vanish via
+    // the cascade in resolveRunProperties; we only ADD vanish here, never clear it.
+    if (isFirstInlineRunVanished(para)) {
+      markerRunAttrs.vanish = true;
+    }
 
     // Only attempt to inherit `previousParagraphFont` when the paragraph doesn't define
     // explicit runProperties. Otherwise markerRunProperties/resolveRunProperties already
