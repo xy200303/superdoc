@@ -20,7 +20,7 @@ List all tracked changes in the document.
 
 ## Expected result
 
-Returns a TrackChangesListResult with tracked change entries, total count, and raw imported Word OOXML revision IDs (`w:id`) when available.
+Returns a TrackChangesListResult with tracked change entries (`insert`, `delete`, `replacement`, `format`), total count, and raw imported Word OOXML revision IDs (`w:id`) when available.
 
 ## Input fields
 
@@ -29,7 +29,7 @@ Returns a TrackChangesListResult with tracked change entries, total count, and r
 | `in` | StoryLocator \\| `"all"` | no | One of: StoryLocator, `"all"` |
 | `limit` | integer | no |  |
 | `offset` | integer | no |  |
-| `type` | enum | no | `"insert"`, `"delete"`, `"format"` |
+| `type` | enum | no | `"insert"`, `"delete"`, `"replacement"`, `"format"` |
 
 ### Example request
 
@@ -123,10 +123,11 @@ Returns a TrackChangesListResult with tracked change entries, total count, and r
       "type": "integer"
     },
     "type": {
-      "description": "Filter by change type: 'insert', 'delete', or 'format'.",
+      "description": "Filter by change type: 'insert', 'delete', 'replacement', or 'format'.",
       "enum": [
         "insert",
         "delete",
+        "replacement",
         "format"
       ]
     }
@@ -173,7 +174,6 @@ Returns a TrackChangesListResult with tracked change entries, total count, and r
             "enum": [
               "standalone",
               "replacement-pair",
-              "aggregate",
               "unknown"
             ]
           },
@@ -196,6 +196,7 @@ Returns a TrackChangesListResult with tracked change entries, total count, and r
             "enum": [
               "insert",
               "delete",
+              "replacement",
               "format"
             ]
           },

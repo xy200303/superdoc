@@ -13,9 +13,8 @@
  *      replacement. SuperDoc's importer (trackedChangeIdMapper.js) maps
  *      adjacent w:del + w:ins with the same author/date to one internal
  *      raw mark id, so both halves share a single entityId at the public
- *      API. Spans carry the per-half type. The aggregate `type` field on
- *      `trackedChanges[]` is best-effort (insert wins over delete); span
- *      type is the source of truth.
+ *      API. Spans carry the per-half type, while the entity-level `type`
+ *      on `trackedChanges[]` is `replacement`.
  *   2. "[del:Delete me]" — a paragraph that is entirely a deletion.
  */
 
@@ -63,7 +62,7 @@ type ChunkForEmbedding =
   | {
       kind: 'tracked-change';
       entityId: string;
-      type: 'insert' | 'delete' | 'format';
+      type: 'insert' | 'delete' | 'replacement' | 'format';
       blockIds: string[];
       content: string;
     };
@@ -148,14 +147,14 @@ describe('extract-adapter consumer simulation (SD-2766)', () => {
     expect(rendered).toContain('Here is a MS Word');
     expect(rendered).toContain('sentence');
 
-    // Word-authored replacement halves remain separate source-wrapper entities,
-    // while each span still resolves to the correct public tracked-change entry.
+    // Word-authored replacement halves keep distinct span-side markers, but
+    // in paired mode they resolve to one public tracked-change entity.
     const delEntity = deleteSpans[0].trackedChanges!.find((c) => c.type === 'delete')!.entityId;
     const insEntity = insertSpans[0].trackedChanges!.find((c) => c.type === 'insert')!.entityId;
     const entitiesById = new Map(result.trackedChanges.map((tc) => [tc.entityId, tc]));
-    expect(insEntity).not.toBe(delEntity);
+    expect(insEntity).toBe(delEntity);
     expect(entitiesById.get(delEntity)?.wordRevisionIds?.delete).toBeTruthy();
-    expect(entitiesById.get(insEntity)?.wordRevisionIds?.insert).toBeTruthy();
+    expect(entitiesById.get(delEntity)?.wordRevisionIds?.insert).toBeTruthy();
   });
 
   it('attaches every tracked change to the blocks it lives in via blockIds', async () => {
@@ -210,10 +209,9 @@ describe('extract-adapter consumer simulation (SD-2766)', () => {
     // the consumer could render a marker but couldn't look up author/date or
     // pass the id to scrollToElement().
     //
-    // We don't assert span.type === aggregate.type. For paired changes (one
-    // entity covering both a delete half and an insert half) the aggregate
-    // type field collapses to "insert" by pre-existing convention. Span type
-    // is the per-half source of truth; the aggregate is for navigation.
+    // We don't assert span.type === entity.type. For paired changes, the
+    // entity-level type is "replacement" while the spans still carry the
+    // per-half delete/insert truth needed for rendering.
     const indexByEntity = new Map(result.trackedChanges.map((tc) => [tc.entityId, tc]));
     for (const entityId of entityIdsInSpans) {
       expect(indexByEntity.get(entityId), `entityId ${entityId} should appear in trackedChanges[]`).toBeDefined();
@@ -258,13 +256,11 @@ describe('extract-adapter consumer simulation (SD-2766)', () => {
     expect(insertEntry).toBeDefined();
     const [deleteEntityId, deleteSegments] = deleteEntry!;
     const [insertEntityId, insertSegments] = insertEntry!;
-    expect(deleteEntityId).not.toBe(insertEntityId);
+    expect(deleteEntityId).toBe(insertEntityId);
 
     const deleteEntity = result.trackedChanges.find((tc) => tc.entityId === deleteEntityId)!;
-    const insertEntity = result.trackedChanges.find((tc) => tc.entityId === insertEntityId)!;
     expect(deleteEntity.wordRevisionIds?.delete).toBeTruthy();
-    expect(insertEntity.wordRevisionIds?.insert).toBeTruthy();
-    expect(deleteEntity.blockIds).toEqual(insertEntity.blockIds);
+    expect(deleteEntity.wordRevisionIds?.insert).toBeTruthy();
 
     expect(deleteSegments.filter((s) => s.type === 'delete').map((s) => s.text)).toEqual(['basic ']);
     expect(

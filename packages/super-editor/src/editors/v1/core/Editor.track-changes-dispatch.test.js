@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { initTestEditor } from '@tests/helpers/helpers.js';
+import { Editor } from '@core/Editor.js';
 import { getTrackChanges } from '@extensions/track-changes/trackChangesHelpers/getTrackChanges.js';
 import { TrackDeleteMarkName, TrackInsertMarkName } from '@extensions/track-changes/constants.js';
 import { TrackChangesBasePluginKey } from '@extensions/track-changes/plugins/trackChangesBasePlugin.js';
@@ -10,6 +14,11 @@ const FIXED_DATE = '2026-05-21T00:00:00.000Z';
 const FOREIGN_INSERT_ID = 'foreign-insert';
 const INSERTED_TEXT = 'here is my new text, do you like it?';
 const INSERTED_TAIL = 'do you like it?';
+const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
+const WORD_REPLACEMENT_FIXTURE = resolve(
+  CURRENT_DIR,
+  '../../../../../../tests/behavior/tests/comments/fixtures/sd-1960-word-replacement-no-comments.docx',
+);
 
 const findTextRange = (editor, text) => {
   let found = null;
@@ -248,6 +257,51 @@ describe('Editor dispatch tracked-change meta', () => {
         authorEmail: 'test@example.com',
       }),
     );
+  });
+
+  it('normalizes modules.trackChanges.replacements for direct Editor.open callers', async () => {
+    const opened = await Editor.open(undefined, {
+      isHeadless: true,
+      modules: { trackChanges: { replacements: 'independent' } },
+    });
+
+    try {
+      expect(opened.options.trackedChanges?.replacements).toBe('independent');
+    } finally {
+      opened.destroy();
+    }
+  });
+
+  it('uses modules.trackChanges.replacements during Word replacement import projection', async () => {
+    const fixture = await readFile(WORD_REPLACEMENT_FIXTURE);
+    const paired = await Editor.open(fixture, {
+      isHeadless: true,
+      modules: { trackChanges: { replacements: 'paired' } },
+    });
+    const independent = await Editor.open(fixture, {
+      isHeadless: true,
+      modules: { trackChanges: { replacements: 'independent' } },
+    });
+
+    try {
+      const pairedItems = paired.doc.trackChanges.list().items;
+      const independentItems = independent.doc.trackChanges.list().items;
+
+      expect(pairedItems).toEqual(
+        expect.arrayContaining([expect.objectContaining({ type: 'replacement', grouping: 'replacement-pair' })]),
+      );
+      expect(independentItems).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'insert', grouping: 'standalone' }),
+          expect.objectContaining({ type: 'delete', grouping: 'standalone' }),
+        ]),
+      );
+      expect(independentItems.some((item) => item.grouping === 'replacement-pair')).toBe(false);
+      expect(independentItems.length).toBeGreaterThan(pairedItems.length);
+    } finally {
+      paired.destroy();
+      independent.destroy();
+    }
   });
 
   it('protects another user tracked insertion from direct delete while local track mode is off', () => {

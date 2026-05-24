@@ -1557,8 +1557,8 @@ const trackChangeInfoSchema = objectSchema(
   {
     address: trackedChangeAddressSchema,
     id: { type: 'string' },
-    type: { enum: ['insert', 'delete', 'format'] },
-    grouping: { enum: ['standalone', 'replacement-pair', 'aggregate', 'unknown'] },
+    type: { enum: ['insert', 'delete', 'replacement', 'format'] },
+    grouping: { enum: ['standalone', 'replacement-pair', 'unknown'] },
     pairedWithChangeId: { type: ['string', 'null'] },
     wordRevisionIds: trackChangeWordRevisionIdsSchema,
     author: { type: 'string' },
@@ -1575,8 +1575,8 @@ const trackChangeInfoSchema = objectSchema(
 const trackChangeDomainItemSchema = discoveryItemSchema(
   {
     address: trackedChangeAddressSchema,
-    type: { enum: ['insert', 'delete', 'format'] },
-    grouping: { enum: ['standalone', 'replacement-pair', 'aggregate', 'unknown'] },
+    type: { enum: ['insert', 'delete', 'replacement', 'format'] },
+    grouping: { enum: ['standalone', 'replacement-pair', 'unknown'] },
     pairedWithChangeId: { type: ['string', 'null'] },
     wordRevisionIds: trackChangeWordRevisionIdsSchema,
     author: { type: 'string' },
@@ -3165,9 +3165,9 @@ const operationSchemas: Record<OperationId, OperationSchemaSet> = {
               },
               type: {
                 type: 'string',
-                enum: ['insert', 'delete', 'format'],
+                enum: ['insert', 'delete', 'replacement', 'format'],
                 description:
-                  "Aggregate type at the entity level. In paired replacement mode, a delete+insert pair shares one entity and this collapses to 'insert'; per-half type lives on block.textSpans[].trackedChanges[].",
+                  "Entity-level type. In paired replacement mode, a delete+insert pair shares one entity with type 'replacement'; per-half type lives on block.textSpans[].trackedChanges[].",
               },
               blockIds: {
                 type: 'array',
@@ -5025,8 +5025,8 @@ const operationSchemas: Record<OperationId, OperationSchemaSet> = {
       limit: { type: 'integer', description: 'Maximum number of tracked changes to return.' },
       offset: { type: 'integer', description: 'Number of tracked changes to skip for pagination.' },
       type: {
-        enum: ['insert', 'delete', 'format'],
-        description: "Filter by change type: 'insert', 'delete', or 'format'.",
+        enum: ['insert', 'delete', 'replacement', 'format'],
+        description: "Filter by change type: 'insert', 'delete', 'replacement', or 'format'.",
       },
       in: {
         oneOf: [storyLocatorSchema, { const: 'all' }],

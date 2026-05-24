@@ -37,6 +37,7 @@ import {
   trackChangesAcceptAllWrapper,
   trackChangesAcceptWrapper,
   trackChangesDecideRangeWrapper,
+  trackChangesGetWrapper,
   trackChangesListWrapper,
   getCachedProjectedTrackedChangeSnapshot,
 } from './track-changes-wrappers.js';
@@ -47,9 +48,13 @@ function expectTrackChangesDecideReceiptCodeDeclared(code: string): void {
   expect(COMMAND_CATALOG['trackChanges.decide'].possibleFailureCodes).toContain(code);
 }
 
-function makeEditor(commands: Record<string, unknown> = {}): Editor {
+function makeEditor(
+  commands: Record<string, unknown> = {},
+  options: Record<string, unknown> = { trackedChanges: {} },
+): Editor {
   return {
     commands,
+    options,
     state: { doc: { textBetween: vi.fn(() => '') } },
   } as unknown as Editor;
 }
@@ -395,13 +400,13 @@ describe('track-changes-wrappers revision guard', () => {
 });
 
 describe('track-changes-wrappers projected id cache', () => {
-  it('keeps default paired replacements as one aggregate public list item', () => {
+  it('keeps default paired replacements as one replacement public list item', () => {
     const editor = makeEditor();
     const replacementSnapshot = {
       address: { kind: 'entity', entityType: 'trackedChange', entityId: 'tc-replacement-1' },
       runtimeRef: { storyKey: 'body', rawId: 'tc-replacement-1' },
       story: { kind: 'story', storyType: 'body' },
-      type: 'insert',
+      type: 'replacement',
       excerpt: 'oldnew',
       wordRevisionIds: { insert: '11', delete: '10' },
       storyLabel: 'Body',
@@ -428,18 +433,159 @@ describe('track-changes-wrappers projected id cache', () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
       id: 'tc-replacement-1',
-      type: 'insert',
-      grouping: 'aggregate',
+      type: 'replacement',
+      grouping: 'replacement-pair',
       wordRevisionIds: { insert: '11', delete: '10' },
     });
     expect(result.items[0]?.id).not.toContain('#');
+
+    const replacementFiltered = trackChangesListWrapper(editor, { type: 'replacement' });
+    expect(replacementFiltered.total).toBe(1);
+    expect(replacementFiltered.items).toHaveLength(1);
+
+    const insertFiltered = trackChangesListWrapper(editor, { type: 'insert' });
+    expect(insertFiltered.total).toBe(0);
+    expect(insertFiltered.items).toEqual([]);
 
     const deleteFiltered = trackChangesListWrapper(editor, { type: 'delete' });
     expect(deleteFiltered.total).toBe(0);
     expect(deleteFiltered.items).toEqual([]);
   });
 
-  it('keeps independent replacement sides paired without aggregating them', () => {
+  it('returns replacement type for paired replacement get lookups', () => {
+    const editor = makeEditor();
+    const replacementSnapshot = {
+      address: { kind: 'entity', entityType: 'trackedChange', entityId: 'tc-replacement-1' },
+      runtimeRef: { storyKey: 'body', rawId: 'tc-replacement-1' },
+      story: { kind: 'story', storyType: 'body' },
+      type: 'replacement',
+      excerpt: 'oldnew',
+      wordRevisionIds: { insert: '11', delete: '10' },
+      storyLabel: 'Body',
+      storyKind: 'body',
+      anchorKey: 'tc::body::tc-replacement-1',
+      hasInsert: true,
+      hasDelete: true,
+      hasFormat: false,
+      range: { from: 4, to: 10 },
+    };
+
+    mocks.resolveTrackedChangeInStory.mockReturnValue({
+      editor,
+      story: { kind: 'story', storyType: 'body' },
+      runtimeRef: replacementSnapshot.runtimeRef,
+      change: {
+        id: 'tc-replacement-1',
+        rawId: 'tc-replacement-1',
+        from: 4,
+        to: 10,
+        hasInsert: true,
+        hasDelete: true,
+        hasFormat: false,
+        attrs: {},
+      },
+    });
+    mocks.getTrackedChangeIndex.mockReturnValue({
+      get: vi.fn(() => [replacementSnapshot]),
+      getAll: vi.fn(() => [replacementSnapshot]),
+      invalidate: vi.fn(),
+      invalidateAll: vi.fn(),
+      subscribe: vi.fn(),
+      dispose: vi.fn(),
+    });
+
+    expect(trackChangesGetWrapper(editor, { id: 'tc-replacement-1' })).toMatchObject({
+      id: 'tc-replacement-1',
+      type: 'replacement',
+      grouping: 'replacement-pair',
+      wordRevisionIds: { insert: '11', delete: '10' },
+    });
+  });
+
+  it('preserves overlap metadata in trackChanges.list and trackChanges.get output', () => {
+    const editor = makeEditor();
+    const overlap = {
+      visualLayers: [
+        { id: 'tc-parent', type: 'insert', relationship: 'parent' },
+        { id: 'tc-child', type: 'delete', relationship: 'child' },
+      ],
+      preferredContextTargetId: 'tc-child',
+      preferredContextTarget: { id: 'tc-child', type: 'delete', relationship: 'child' },
+    };
+    const parentSnapshot = {
+      address: { kind: 'entity', entityType: 'trackedChange', entityId: 'tc-parent' },
+      runtimeRef: { storyKey: 'body', rawId: 'parent-raw' },
+      story: { kind: 'story', storyType: 'body' },
+      type: 'insert',
+      excerpt: 'review',
+      overlap,
+      storyLabel: 'Body',
+      storyKind: 'body',
+      anchorKey: 'tc::body::parent-raw',
+      hasInsert: true,
+      hasDelete: false,
+      hasFormat: false,
+      range: { from: 4, to: 10 },
+    };
+    const childSnapshot = {
+      address: { kind: 'entity', entityType: 'trackedChange', entityId: 'tc-child' },
+      runtimeRef: { storyKey: 'body', rawId: 'child-raw' },
+      story: { kind: 'story', storyType: 'body' },
+      type: 'delete',
+      excerpt: 'review',
+      storyLabel: 'Body',
+      storyKind: 'body',
+      anchorKey: 'tc::body::child-raw',
+      hasInsert: false,
+      hasDelete: true,
+      hasFormat: false,
+      range: { from: 4, to: 10 },
+    };
+
+    mocks.resolveTrackedChangeInStory.mockReturnValue({
+      editor,
+      story: { kind: 'story', storyType: 'body' },
+      runtimeRef: parentSnapshot.runtimeRef,
+      change: {
+        id: 'tc-parent',
+        rawId: 'parent-raw',
+        from: 4,
+        to: 10,
+        hasInsert: true,
+        hasDelete: false,
+        hasFormat: false,
+        attrs: {},
+        overlap,
+      },
+    });
+    mocks.getTrackedChangeIndex.mockReturnValue({
+      get: vi.fn(() => [parentSnapshot, childSnapshot]),
+      getAll: vi.fn(() => [parentSnapshot, childSnapshot]),
+      invalidate: vi.fn(),
+      invalidateAll: vi.fn(),
+      subscribe: vi.fn(),
+      dispose: vi.fn(),
+    });
+
+    const listResult = trackChangesListWrapper(editor);
+
+    expect(listResult.items).toHaveLength(2);
+    expect(listResult.items[0]).toMatchObject({
+      id: 'tc-parent',
+      type: 'insert',
+      grouping: 'standalone',
+      overlap,
+    });
+
+    expect(trackChangesGetWrapper(editor, { id: 'tc-parent' })).toMatchObject({
+      id: 'tc-parent',
+      type: 'insert',
+      grouping: 'standalone',
+      overlap,
+    });
+  });
+
+  it('collapses split paired replacements into one public replacement item by default', () => {
     const editor = makeEditor();
     const insertedSnapshot = {
       address: { kind: 'entity', entityType: 'trackedChange', entityId: 'tc-insert' },
@@ -487,11 +633,105 @@ describe('track-changes-wrappers projected id cache', () => {
 
     const result = trackChangesListWrapper(editor);
 
+    expect(result.total).toBe(1);
+    expect(result.items[0]).toMatchObject({
+      id: 'tc-insert',
+      type: 'replacement',
+      grouping: 'replacement-pair',
+      pairedWithChangeId: undefined,
+      insertedText: 'new',
+      deletedText: 'old',
+    });
+  });
+
+  it('keeps split replacement sides separate in independent mode', () => {
+    const editor = makeEditor({}, { trackedChanges: { replacements: 'independent' } });
+    const insertedSnapshot = {
+      address: { kind: 'entity', entityType: 'trackedChange', entityId: 'tc-insert' },
+      runtimeRef: { storyKey: 'body', rawId: 'tc-insert' },
+      story: { kind: 'story', storyType: 'body' },
+      type: 'insert',
+      excerpt: 'new',
+      storyLabel: 'Body',
+      storyKind: 'body',
+      anchorKey: 'tc::body::tc-insert',
+      commandRawId: 'replacement-command-1',
+      replacementGroupId: 'replacement-1',
+      replacementSideId: 'replacement-1#inserted',
+      hasInsert: true,
+      hasDelete: false,
+      hasFormat: false,
+      range: { from: 4, to: 7 },
+    };
+    const deletedSnapshot = {
+      address: { kind: 'entity', entityType: 'trackedChange', entityId: 'tc-delete' },
+      runtimeRef: { storyKey: 'body', rawId: 'tc-delete' },
+      story: { kind: 'story', storyType: 'body' },
+      type: 'delete',
+      excerpt: 'old',
+      storyLabel: 'Body',
+      storyKind: 'body',
+      anchorKey: 'tc::body::tc-delete',
+      commandRawId: 'replacement-command-1',
+      replacementGroupId: 'replacement-1',
+      replacementSideId: 'replacement-1#deleted',
+      hasInsert: false,
+      hasDelete: true,
+      hasFormat: false,
+      range: { from: 7, to: 10 },
+    };
+
+    mocks.getTrackedChangeIndex.mockReturnValue({
+      get: vi.fn(() => [insertedSnapshot, deletedSnapshot]),
+      getAll: vi.fn(() => [insertedSnapshot, deletedSnapshot]),
+      invalidate: vi.fn(),
+      invalidateAll: vi.fn(),
+      subscribe: vi.fn(),
+      dispose: vi.fn(),
+    });
+
+    const result = trackChangesListWrapper(editor);
+
     expect(result.total).toBe(2);
-    expect(result.items.map((item) => [item.id, item.grouping, item.pairedWithChangeId])).toEqual([
-      ['tc-insert', 'replacement-pair', 'tc-delete'],
-      ['tc-delete', 'replacement-pair', 'tc-insert'],
+    expect(result.items.map((item) => [item.id, item.type, item.grouping, item.pairedWithChangeId])).toEqual([
+      ['tc-insert', 'insert', 'standalone', undefined],
+      ['tc-delete', 'delete', 'standalone', undefined],
     ]);
+  });
+
+  it('projects combined replacement snapshots as replacement even when raw type is format', () => {
+    const editor = makeEditor();
+    const snapshot = {
+      address: { kind: 'entity', entityType: 'trackedChange', entityId: 'tc-replacement-2' },
+      runtimeRef: { storyKey: 'body', rawId: 'tc-replacement-2' },
+      story: { kind: 'story', storyType: 'body' },
+      type: 'format',
+      excerpt: 'native replacement',
+      storyLabel: 'Body',
+      storyKind: 'body',
+      anchorKey: 'tc::body::tc-replacement-2',
+      hasInsert: true,
+      hasDelete: true,
+      hasFormat: true,
+      range: { from: 10, to: 30 },
+    };
+
+    mocks.getTrackedChangeIndex.mockReturnValue({
+      get: vi.fn(() => [snapshot]),
+      getAll: vi.fn(() => [snapshot]),
+      invalidate: vi.fn(),
+      invalidateAll: vi.fn(),
+      subscribe: vi.fn(),
+      dispose: vi.fn(),
+    });
+
+    const result = trackChangesListWrapper(editor);
+
+    expect(result.items[0]).toMatchObject({
+      id: 'tc-replacement-2',
+      type: 'replacement',
+      grouping: 'replacement-pair',
+    });
   });
 
   it('caches list ids for reuse on the same editor revision', () => {

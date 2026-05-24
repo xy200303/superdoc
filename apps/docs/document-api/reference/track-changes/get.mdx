@@ -20,7 +20,7 @@ Retrieve a single tracked change by ID.
 
 ## Expected result
 
-Returns a TrackChangeInfo object with the change type, author, date, affected content, and raw imported Word OOXML revision IDs (`w:id`) when available.
+Returns a TrackChangeInfo object with the change type (`insert`, `delete`, `replacement`, `format`), author, date, affected content, and raw imported Word OOXML revision IDs (`w:id`) when available.
 
 ## Input fields
 
@@ -56,11 +56,11 @@ Returns a TrackChangeInfo object with the change type, author, date, affected co
 | `date` | string | no |  |
 | `deletedText` | string | no |  |
 | `excerpt` | string | no |  |
-| `grouping` | enum | no | `"standalone"`, `"replacement-pair"`, `"aggregate"`, `"unknown"` |
+| `grouping` | enum | no | `"standalone"`, `"replacement-pair"`, `"unknown"` |
 | `id` | string | yes |  |
 | `insertedText` | string | no |  |
 | `pairedWithChangeId` | any | no |  |
-| `type` | enum | yes | `"insert"`, `"delete"`, `"format"` |
+| `type` | enum | yes | `"insert"`, `"delete"`, `"replacement"`, `"format"` |
 | `wordRevisionIds` | object | no |  |
 | `wordRevisionIds.delete` | string | no |  |
 | `wordRevisionIds.format` | string | no |  |
@@ -146,7 +146,6 @@ Returns a TrackChangeInfo object with the change type, author, date, affected co
       "enum": [
         "standalone",
         "replacement-pair",
-        "aggregate",
         "unknown"
       ]
     },
@@ -166,6 +165,7 @@ Returns a TrackChangeInfo object with the change type, author, date, affected co
       "enum": [
         "insert",
         "delete",
+        "replacement",
         "format"
       ]
     },

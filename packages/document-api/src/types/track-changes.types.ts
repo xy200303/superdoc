@@ -2,9 +2,9 @@ import type { TrackedChangeAddress } from './address.js';
 import type { DiscoveryOutput } from './discovery.js';
 import type { StoryLocator } from './story.types.js';
 
-export type TrackChangeType = 'insert' | 'delete' | 'format';
+export type TrackChangeType = 'insert' | 'delete' | 'replacement' | 'format';
 export type TrackChangeOverlapRelationship = 'parent' | 'child' | 'standalone';
-export type TrackChangeGrouping = 'standalone' | 'replacement-pair' | 'aggregate' | 'unknown';
+export type TrackChangeGrouping = 'standalone' | 'replacement-pair' | 'unknown';
 
 export interface TrackChangeOverlapLayer {
   id: string;

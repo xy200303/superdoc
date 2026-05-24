@@ -72,6 +72,21 @@ type ProjectedTrackedChangeCacheEntry = {
 };
 
 const projectedTrackedChangeCache = new WeakMap<Editor, ProjectedTrackedChangeCacheEntry>();
+type ReplacementsMode = 'paired' | 'independent';
+
+function readReplacementsMode(editor: Editor): ReplacementsMode {
+  return editor?.options?.trackedChanges?.replacements === 'independent' ? 'independent' : 'paired';
+}
+
+function buildChangedTextFields(
+  type: TrackChangeType,
+  excerpt: string | undefined,
+): Pick<TrackChangeInfo, 'insertedText' | 'deletedText'> | Record<never, never> {
+  if (!excerpt) return {};
+  if (type === 'insert') return { insertedText: excerpt };
+  if (type === 'delete') return { deletedText: excerpt };
+  return {};
+}
 
 function buildProjectedInfo(
   snapshot: TrackedChangeSnapshot,
@@ -85,9 +100,6 @@ function buildProjectedInfo(
 ): ProjectedTrackChange {
   const id = options.id ?? snapshot.address.entityId;
   const type = options.type ?? snapshot.type;
-  const changedText = snapshot.excerpt
-    ? { [type === 'delete' ? 'deletedText' : 'insertedText']: snapshot.excerpt }
-    : {};
   return {
     info: {
       address: {
@@ -105,7 +117,7 @@ function buildProjectedInfo(
       authorImage: snapshot.authorImage,
       date: snapshot.date,
       excerpt: snapshot.excerpt,
-      ...(type === 'format' ? {} : changedText),
+      ...buildChangedTextFields(type, snapshot.excerpt),
     },
     handleKey: `${snapshot.anchorKey}${options.handleSuffix ?? ''}`,
     snapshot,
@@ -113,7 +125,7 @@ function buildProjectedInfo(
 }
 
 function isCombinedReplacementSnapshot(snapshot: TrackedChangeSnapshot): boolean {
-  return snapshot.hasInsert && snapshot.hasDelete && !snapshot.hasFormat;
+  return snapshot.hasInsert && snapshot.hasDelete;
 }
 
 function replacementPairKey(snapshot: TrackedChangeSnapshot): string | null {
@@ -127,19 +139,59 @@ function replacementPairKey(snapshot: TrackedChangeSnapshot): string | null {
   return null;
 }
 
+function projectedSnapshotType(snapshot: TrackedChangeSnapshot): TrackChangeType {
+  return isCombinedReplacementSnapshot(snapshot) ? 'replacement' : snapshot.type;
+}
+
 function snapshotGrouping(snapshot: TrackedChangeSnapshot): TrackChangeInfo['grouping'] {
-  return isCombinedReplacementSnapshot(snapshot) ? 'aggregate' : 'standalone';
+  return isCombinedReplacementSnapshot(snapshot) ? 'replacement-pair' : 'standalone';
 }
 
 function snapshotToProjected(snapshot: TrackedChangeSnapshot): ProjectedTrackChange {
-  return buildProjectedInfo(snapshot, { grouping: snapshotGrouping(snapshot), pairedWithChangeId: null });
+  return buildProjectedInfo(snapshot, {
+    type: projectedSnapshotType(snapshot),
+    grouping: snapshotGrouping(snapshot),
+    pairedWithChangeId: null,
+  });
 }
 
 function snapshotToInfo(snapshot: TrackedChangeSnapshot): TrackChangeInfo {
   return snapshotToProjected(snapshot).info;
 }
 
-export function projectSnapshots(snapshots: ReadonlyArray<TrackedChangeSnapshot>): ProjectedTrackChange[] {
+function mergeWordRevisionIdsFromPair(
+  inserted: TrackedChangeSnapshot,
+  deleted: TrackedChangeSnapshot,
+): TrackChangeWordRevisionIds | undefined {
+  return normalizeWordRevisionIds({
+    insert: inserted.wordRevisionIds?.insert,
+    delete: deleted.wordRevisionIds?.delete,
+    format: inserted.wordRevisionIds?.format ?? deleted.wordRevisionIds?.format,
+  });
+}
+
+function projectSplitReplacementPair(group: ReadonlyArray<TrackedChangeSnapshot>): ProjectedTrackChange | null {
+  const inserted = group.find((snapshot) => snapshot.type === 'insert');
+  const deleted = group.find((snapshot) => snapshot.type === 'delete');
+  if (!inserted || !deleted) return null;
+
+  const projected = buildProjectedInfo(inserted, {
+    type: 'replacement',
+    grouping: 'replacement-pair',
+    pairedWithChangeId: null,
+  });
+
+  projected.info.wordRevisionIds = mergeWordRevisionIdsFromPair(inserted, deleted);
+  projected.info.insertedText = inserted.excerpt;
+  projected.info.deletedText = deleted.excerpt;
+
+  return projected;
+}
+
+export function projectSnapshots(
+  snapshots: ReadonlyArray<TrackedChangeSnapshot>,
+  replacements: ReplacementsMode = 'paired',
+): ProjectedTrackChange[] {
   const byPairKey = new Map<string, TrackedChangeSnapshot[]>();
   for (const snapshot of snapshots) {
     if (isCombinedReplacementSnapshot(snapshot)) continue;
@@ -150,29 +202,35 @@ export function projectSnapshots(snapshots: ReadonlyArray<TrackedChangeSnapshot>
     byPairKey.set(key, group);
   }
 
-  const pairedById = new Map<string, string>();
-  for (const group of byPairKey.values()) {
-    const inserts = group.filter((snapshot) => snapshot.type === 'insert');
-    const deletes = group.filter((snapshot) => snapshot.type === 'delete');
-    if (inserts.length !== 1 || deletes.length !== 1) continue;
-    pairedById.set(inserts[0].address.entityId, deletes[0].address.entityId);
-    pairedById.set(deletes[0].address.entityId, inserts[0].address.entityId);
+  const collapsedByPairKey = new Map<string, ProjectedTrackChange>();
+  if (replacements === 'paired') {
+    for (const [key, group] of byPairKey.entries()) {
+      const collapsed = projectSplitReplacementPair(group);
+      if (collapsed) collapsedByPairKey.set(key, collapsed);
+    }
   }
 
   const projected: ProjectedTrackChange[] = [];
+  const emittedPairKeys = new Set<string>();
   for (const snapshot of snapshots) {
     if (isCombinedReplacementSnapshot(snapshot)) {
       projected.push(snapshotToProjected(snapshot));
       continue;
     }
 
-    const pairedWithChangeId = pairedById.get(snapshot.address.entityId) ?? null;
-    projected.push(
-      buildProjectedInfo(snapshot, {
-        grouping: pairedWithChangeId ? 'replacement-pair' : 'standalone',
-        pairedWithChangeId,
-      }),
-    );
+    const pairKey = replacementPairKey(snapshot);
+    if (pairKey && replacements === 'paired') {
+      const collapsed = collapsedByPairKey.get(pairKey);
+      if (collapsed) {
+        if (!emittedPairKeys.has(pairKey)) {
+          emittedPairKeys.add(pairKey);
+          projected.push(collapsed);
+        }
+        continue;
+      }
+    }
+
+    projected.push(buildProjectedInfo(snapshot, { grouping: 'standalone', pairedWithChangeId: null }));
   }
 
   return projected;
@@ -263,14 +321,14 @@ export function trackChangesListWrapper(editor: Editor, input?: TrackChangesList
     rawSnapshots = index.get(scope.story);
   }
 
-  const projected = projectSnapshots(rawSnapshots);
+  const projected = projectSnapshots(rawSnapshots, readReplacementsMode(editor));
   const evaluatedRevision = getRevision(editor);
   cacheProjectedTrackedChanges(editor, projected, evaluatedRevision);
   const filtered = filterProjectedByType(projected, input?.type);
   const paged = paginate(filtered, input?.offset, input?.limit);
   // Track-changes discovery uses a document-level revision token across every
   // scope. Part commits also advance the host revision, so one shared token
-  // correctly guards body, story-scoped, and aggregate review flows.
+  // correctly guards body, story-scoped, and replacement-aware review flows.
 
   const items = paged.items.map((row) => {
     const info = row.info;
@@ -332,7 +390,7 @@ export function trackChangesGetWrapper(editor: Editor, input: TrackChangesGetInp
   const anchorKey = makeTrackedChangeAnchorKey(resolved.runtimeRef);
   const snapshots =
     storyKey === BODY_STORY_KEY ? index.get({ kind: 'story', storyType: 'body' }) : index.get(resolved.story);
-  const projected = projectSnapshots(snapshots);
+  const projected = projectSnapshots(snapshots, readReplacementsMode(editor));
   const projectedMatch = projected.find((row) => row.info.id === id);
 
   if (projectedMatch) return projectedMatch.info;
@@ -346,7 +404,10 @@ export function trackChangesGetWrapper(editor: Editor, input: TrackChangesGetInp
   const excerpt =
     (resolved.change.excerpt !== undefined ? resolved.change.excerpt : undefined) ??
     normalizeExcerpt(resolved.editor.state.doc.textBetween(resolved.change.from, resolved.change.to, ' ', '\ufffc'));
-  const changedText = excerpt ? { [type === 'delete' ? 'deletedText' : 'insertedText']: excerpt } : {};
+  const grouping =
+    resolved.change.hasInsert && resolved.change.hasDelete && !resolved.change.hasFormat
+      ? 'replacement-pair'
+      : undefined;
 
   return {
     address: {
@@ -357,6 +418,7 @@ export function trackChangesGetWrapper(editor: Editor, input: TrackChangesGetInp
     },
     id: resolved.change.id,
     type,
+    grouping,
     wordRevisionIds: normalizeWordRevisionIds(resolved.change.wordRevisionIds),
     overlap: resolved.change.overlap,
     author: toNonEmptyString(resolved.change.attrs.author),
@@ -364,7 +426,7 @@ export function trackChangesGetWrapper(editor: Editor, input: TrackChangesGetInp
     authorImage: toNonEmptyString(resolved.change.attrs.authorImage),
     date: toNonEmptyString(resolved.change.attrs.date),
     excerpt,
-    ...(type === 'format' ? {} : changedText),
+    ...buildChangedTextFields(type, excerpt),
   };
 }
 

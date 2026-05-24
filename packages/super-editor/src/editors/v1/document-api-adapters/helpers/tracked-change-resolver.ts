@@ -119,11 +119,17 @@ function deriveTrackedChangeId(editor: Editor, change: Omit<GroupedTrackedChange
 
 export function resolveTrackedChangeType(change: ChangeTypeInput): TrackChangeType {
   if (change.hasFormat) return 'format';
-  if (change.hasDelete && !change.hasInsert) return 'delete';
+  if (change.hasInsert && change.hasDelete) return 'replacement';
+  if (change.hasDelete) return 'delete';
   return 'insert';
 }
 
 const groupedCache = new WeakMap<Editor, { doc: ProseMirrorNode; grouped: GroupedTrackedChange[] }>();
+type ReplacementsMode = 'paired' | 'independent';
+
+function readReplacementsMode(editor: Editor): ReplacementsMode {
+  return editor?.options?.trackedChanges?.replacements === 'independent' ? 'independent' : 'paired';
+}
 
 function mergeWordRevisionId(
   target: TrackChangeWordRevisionIds | undefined,
@@ -169,9 +175,53 @@ function getTrackedChangeAliasCandidates(change: GroupedTrackedChange): string[]
     change.commandRawId,
     change.id,
     toNonEmptyString(change.attrs.id),
+    toNonEmptyString(change.attrs.replacementGroupId),
     toNonEmptyString(change.attrs.sourceId),
   ];
   return Array.from(new Set(candidates.filter((value): value is string => Boolean(value))));
+}
+
+function replacementPairKey(change: GroupedTrackedChange): string | null {
+  if (change.hasInsert === change.hasDelete) return null;
+  const replacementGroupId = toNonEmptyString(change.attrs.replacementGroupId);
+  if (replacementGroupId) return `group:${replacementGroupId}`;
+  if (change.commandRawId) return `command:${change.commandRawId}`;
+  return null;
+}
+
+function buildPublicTrackedChangeIdMap(
+  grouped: ReadonlyArray<GroupedTrackedChange>,
+  replacements: ReplacementsMode,
+): Map<GroupedTrackedChange, string> {
+  const publicIdByChange = new Map<GroupedTrackedChange, string>();
+
+  if (replacements === 'paired') {
+    const byPairKey = new Map<string, GroupedTrackedChange[]>();
+    for (const change of grouped) {
+      if (change.hasInsert && change.hasDelete) continue;
+      const key = replacementPairKey(change);
+      if (!key) continue;
+      const bucket = byPairKey.get(key) ?? [];
+      bucket.push(change);
+      byPairKey.set(key, bucket);
+    }
+
+    for (const group of byPairKey.values()) {
+      const inserted = group.find((change) => change.hasInsert && !change.hasDelete);
+      const deleted = group.find((change) => change.hasDelete && !change.hasInsert);
+      if (!inserted || !deleted) continue;
+      publicIdByChange.set(inserted, inserted.id);
+      publicIdByChange.set(deleted, inserted.id);
+    }
+  }
+
+  for (const change of grouped) {
+    if (!publicIdByChange.has(change)) {
+      publicIdByChange.set(change, change.id);
+    }
+  }
+
+  return publicIdByChange;
 }
 
 function layerFromChange(
@@ -362,21 +412,25 @@ export function resolveTrackedChange(editor: Editor, id: string): GroupedTracked
 
 export function toCanonicalTrackedChangeId(editor: Editor, rawId: string): string | null {
   const { baseId, side } = splitProjectedTrackedChangeId(rawId);
-  const grouped = groupTrackedChanges(editor);
-  const canonical =
-    grouped.find((item) => item.rawId === baseId || item.commandRawId === baseId || item.id === baseId)?.id ?? null;
+  const canonical = buildTrackedChangeCanonicalIdMap(editor).get(baseId) ?? null;
   if (!canonical) return null;
   return side ? `${canonical}#${side}` : canonical;
 }
 
 export function buildTrackedChangeCanonicalIdMap(editor: Editor): Map<string, string> {
   const grouped = groupTrackedChanges(editor);
+  const publicIdByChange = buildPublicTrackedChangeIdMap(grouped, readReplacementsMode(editor));
   const map = new Map<string, string>();
   for (const change of grouped) {
-    map.set(change.rawId, change.id);
-    map.set(change.id, change.id);
-    map.set(`${change.id}#inserted`, change.id);
-    map.set(`${change.id}#deleted`, change.id);
+    const publicId = publicIdByChange.get(change) ?? change.id;
+    map.set(change.rawId, publicId);
+    map.set(change.id, publicId);
+    if (change.commandRawId) map.set(change.commandRawId, publicId);
+    const replacementGroupId = toNonEmptyString(change.attrs.replacementGroupId);
+    if (replacementGroupId) map.set(replacementGroupId, publicId);
+    map.set(publicId, publicId);
+    map.set(`${publicId}#inserted`, publicId);
+    map.set(`${publicId}#deleted`, publicId);
   }
   return map;
 }

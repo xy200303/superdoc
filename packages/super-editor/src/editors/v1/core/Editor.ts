@@ -100,6 +100,25 @@ import { getViewModeSelectionWithoutStructuredContent } from './helpers/getViewM
 import { resolveMainBodyEditor } from '../document-api-adapters/helpers/word-statistics.js';
 import { commitLiveStorySessionRuntimes } from '../document-api-adapters/story-runtime/live-story-session-runtime-registry.js';
 
+type TrackChangesRuntimeConfig = NonNullable<EditorOptions['trackedChanges']>;
+
+function normalizeEditorTrackChangesOptions(options: Partial<EditorOptions>): Partial<EditorOptions> {
+  const canonical = options.modules?.trackChanges;
+  const legacy = options.trackedChanges;
+
+  if (!canonical && !legacy) return options;
+
+  const normalized: TrackChangesRuntimeConfig = {
+    ...(legacy ?? {}),
+    ...(canonical ?? {}),
+  };
+
+  return {
+    ...options,
+    trackedChanges: normalized,
+  };
+}
+
 type ConverterWithInternalWordIdAllocator = EditorConverterSurface & {
   wordIdAllocator?: {
     getSourceIdMap?: () => Record<string, Record<string, string>>;
@@ -640,7 +659,7 @@ export class Editor extends EventEmitter<EditorEventMap> {
   constructor(options: Partial<EditorOptions>) {
     super();
 
-    const resolvedOptions = { ...options };
+    const resolvedOptions = normalizeEditorTrackChangesOptions(options);
     const domAvailable = canUseDOM();
     const isHeadlessRequested = Boolean(resolvedOptions.isHeadless);
     const mountRequested = Boolean(resolvedOptions.element || resolvedOptions.selector);

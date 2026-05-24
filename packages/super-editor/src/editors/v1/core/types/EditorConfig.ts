@@ -380,6 +380,15 @@ export interface EditorOptions {
   comments?: CommentConfig;
 
   /**
+   * Public SuperDoc module configuration accepted by direct/headless
+   * `Editor.open()` callers. SuperDoc app config normalizes this before it
+   * reaches the editor; CLI/SDK headless callers pass it directly.
+   */
+  modules?: {
+    trackChanges?: EditorOptions['trackedChanges'] | null;
+  };
+
+  /**
    * Track-changes runtime configuration forwarded from the SuperDoc-level
    * `modules.trackChanges` config. Read by the TrackChanges extension and
    * by the SuperConverter during import. Fields are all optional; missing

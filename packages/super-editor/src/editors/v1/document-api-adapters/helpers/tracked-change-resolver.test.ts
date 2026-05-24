@@ -18,8 +18,9 @@ vi.mock('../../extensions/track-changes/trackChangesHelpers/getTrackChanges.js',
   getTrackChanges: vi.fn(),
 }));
 
-function makeEditor(): Editor {
+function makeEditor(options: Record<string, unknown> = { trackedChanges: {} }): Editor {
   return {
+    options,
     state: {
       doc: {
         content: { size: 100 },
@@ -55,8 +56,8 @@ describe('resolveTrackedChangeType', () => {
     expect(resolveTrackedChangeType({ hasInsert: true, hasDelete: true, hasFormat: true })).toBe('format');
   });
 
-  it('returns insert when both hasInsert and hasDelete are true (no format)', () => {
-    expect(resolveTrackedChangeType({ hasInsert: true, hasDelete: true, hasFormat: false })).toBe('insert');
+  it('returns replacement when both hasInsert and hasDelete are true (no format)', () => {
+    expect(resolveTrackedChangeType({ hasInsert: true, hasDelete: true, hasFormat: false })).toBe('replacement');
   });
 });
 
@@ -209,6 +210,51 @@ describe('groupTrackedChanges', () => {
     expect(childChange?.excerpt).toBe('review');
   });
 
+  it('attaches overlap visual layers to the parent insertion with child deletion as the context target', () => {
+    const parent = makeTrackMark(TrackInsertMarkName, 'parent-overlap', { author: 'Insert Author' });
+    const child = makeTrackMark(TrackDeleteMarkName, 'child-overlap', {
+      author: 'Delete Author',
+      overlapParentId: 'parent-overlap',
+    });
+    const node = { text: 'review', marks: [parent.mark, child.mark] };
+    vi.mocked(getTrackChanges).mockReturnValue([
+      { ...child, node, from: 1, to: 7 },
+      { ...parent, node, from: 1, to: 7 },
+    ] as never);
+
+    const grouped = groupTrackedChanges(makeEditor());
+    const parentChange = grouped.find((change) => change.rawId === 'parent-overlap');
+    const childChange = grouped.find((change) => change.rawId === 'child-overlap');
+
+    expect(parentChange).toBeDefined();
+    expect(childChange).toBeDefined();
+    expect(parentChange!.overlap?.visualLayers).toEqual([
+      {
+        id: parentChange!.id,
+        rawId: 'parent-overlap',
+        commandRawId: 'parent-overlap',
+        type: 'insert',
+        relationship: 'parent',
+      },
+      {
+        id: childChange!.id,
+        rawId: 'child-overlap',
+        commandRawId: 'child-overlap',
+        type: 'delete',
+        relationship: 'child',
+      },
+    ]);
+    expect(parentChange!.overlap?.preferredContextTargetId).toBe(childChange!.id);
+    expect(parentChange!.overlap?.preferredContextTarget).toEqual({
+      id: childChange!.id,
+      rawId: 'child-overlap',
+      commandRawId: 'child-overlap',
+      type: 'delete',
+      relationship: 'child',
+    });
+    expect(childChange!.overlap).toBeUndefined();
+  });
+
   it('preserves significant Word revision whitespace in explicit excerpts', () => {
     const mark = makeTrackMark(TrackDeleteMarkName, 'delete-with-space', { sourceId: '4' });
     vi.mocked(getTrackChanges).mockReturnValue([
@@ -311,8 +357,27 @@ describe('buildTrackedChangeCanonicalIdMap', () => {
     expect(insertChange).toBeDefined();
     expect(deleteChange).toBeDefined();
     expect(map.get(`word:${TrackInsertMarkName}:11`)).toBe(insertChange!.id);
+    expect(map.get(`word:${TrackDeleteMarkName}:10`)).toBe(insertChange!.id);
+    expect(map.get('tc-1')).toBe(insertChange!.id);
+  });
+
+  it('keeps split replacement aliases separate in independent mode', () => {
+    vi.mocked(getTrackChanges).mockReturnValue([
+      { ...makeTrackMark(TrackInsertMarkName, 'tc-1', { sourceId: '11' }), from: 1, to: 5 },
+      { ...makeTrackMark(TrackDeleteMarkName, 'tc-1', { sourceId: '10' }), from: 5, to: 10 },
+    ] as never);
+
+    const editor = makeEditor({ trackedChanges: { replacements: 'independent' } });
+    const map = buildTrackedChangeCanonicalIdMap(editor);
+    const grouped = groupTrackedChanges(editor);
+    const insertChange = grouped.find((change) => change.rawId === `word:${TrackInsertMarkName}:11`);
+    const deleteChange = grouped.find((change) => change.rawId === `word:${TrackDeleteMarkName}:10`);
+
+    expect(insertChange).toBeDefined();
+    expect(deleteChange).toBeDefined();
+    expect(map.get(`word:${TrackInsertMarkName}:11`)).toBe(insertChange!.id);
     expect(map.get(`word:${TrackDeleteMarkName}:10`)).toBe(deleteChange!.id);
-    expect(map.get('tc-1')).toBeUndefined();
+    expect(map.get('tc-1')).toBe(deleteChange!.id);
   });
 
   it('returns empty map when no tracked changes exist', () => {

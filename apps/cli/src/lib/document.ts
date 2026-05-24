@@ -50,9 +50,16 @@ interface ContentOverrideOptions {
   plainText?: string;
 }
 
+type TrackChangesReplacementMode = 'paired' | 'independent';
+
 /** Options passed through to Editor.open() alongside content overrides. */
 export interface EditorPassThroughOptions {
   password?: string;
+  modules?: {
+    trackChanges?: {
+      replacements?: TrackChangesReplacementMode;
+    };
+  };
 }
 
 interface OpenDocumentOptions {

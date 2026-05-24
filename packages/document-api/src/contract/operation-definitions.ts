@@ -416,14 +416,14 @@ export const INTENT_GROUP_META: Record<string, IntentGroupMeta> = {
   track_changes: {
     toolName: 'superdoc_track_changes',
     description:
-      'Review and resolve tracked changes (insertions, deletions, format changes) in the document. ' +
-      'Action "list" returns all tracked changes with optional filtering by type (insert, delete, format) and pagination (limit, offset). Each change includes an ID, type, author, timestamp, and content preview. ' +
+      'Review and resolve tracked changes (insertions, deletions, replacements, format changes) in the document. ' +
+      'Action "list" returns all tracked changes with optional filtering by type (insert, delete, replacement, format) and pagination (limit, offset). Each change includes an ID, type, author, timestamp, and content preview. ' +
       'Action "decide" accepts or rejects changes. Pass decision:"accept" to apply the change permanently, or decision:"reject" to discard it. ' +
       'Target a single change with {id:"<changeId>"} or all changes at once with {scope:"all"}. ' +
       'Do NOT use this tool unless the document has tracked changes. Use superdoc_get_content info to check the tracked change count first.',
     inputExamples: [
       { action: 'list' },
-      { action: 'list', type: 'insert', limit: 10 },
+      { action: 'list', type: 'replacement', limit: 10 },
       { action: 'decide', decision: 'accept', target: { id: '<changeId>' } },
       { action: 'decide', decision: 'reject', target: { scope: 'all' } },
     ],
@@ -2473,7 +2473,7 @@ export const OPERATION_DEFINITIONS = {
     memberPath: 'trackChanges.list',
     description: 'List all tracked changes in the document.',
     expectedResult:
-      'Returns a TrackChangesListResult with tracked change entries, total count, and raw imported Word OOXML revision IDs (`w:id`) when available.',
+      'Returns a TrackChangesListResult with tracked change entries (`insert`, `delete`, `replacement`, `format`), total count, and raw imported Word OOXML revision IDs (`w:id`) when available.',
     requiresDocumentContext: true,
     metadata: readOperation({
       idempotency: 'idempotent',
@@ -2488,7 +2488,7 @@ export const OPERATION_DEFINITIONS = {
     memberPath: 'trackChanges.get',
     description: 'Retrieve a single tracked change by ID.',
     expectedResult:
-      'Returns a TrackChangeInfo object with the change type, author, date, affected content, and raw imported Word OOXML revision IDs (`w:id`) when available.',
+      'Returns a TrackChangeInfo object with the change type (`insert`, `delete`, `replacement`, `format`), author, date, affected content, and raw imported Word OOXML revision IDs (`w:id`) when available.',
     requiresDocumentContext: true,
     metadata: readOperation({
       idempotency: 'idempotent',

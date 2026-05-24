@@ -1001,6 +1001,7 @@ const TRACK_CHANGE_BASE_CLASS: Record<TrackedChangeKind, string> = {
   delete: 'track-delete-dec',
   format: 'track-format-dec',
 };
+const TRACK_CHANGE_OVERLAP_INSERT_DELETE_CLASS = 'track-overlap-insert-delete-dec';
 // TRACK_CHANGE_FOCUSED_CLASS moved to CommentHighlightDecorator (super-editor).
 
 const TRACK_CHANGE_MODIFIER_CLASS: Record<TrackedChangeKind, Record<TrackedChangesMode, string | undefined>> = {
@@ -1029,11 +1030,29 @@ type TrackedChangesRenderConfig = {
   enabled: boolean;
 };
 
+type InsertDeleteOverlap = {
+  parentInsert: TrackedChangeMeta;
+  childDelete: TrackedChangeMeta;
+};
+
 const getTrackedChangeLayers = (run: TextRun): TrackedChangeMeta[] => {
   if (Array.isArray(run.trackedChanges) && run.trackedChanges.length > 0) {
     return run.trackedChanges;
   }
   return run.trackedChange ? [run.trackedChange] : [];
+};
+
+const resolveInsertDeleteOverlap = (layers: TrackedChangeMeta[]): InsertDeleteOverlap | undefined => {
+  for (const parentInsert of layers) {
+    if (parentInsert.kind !== 'insert') {
+      continue;
+    }
+    const childDelete = layers.find((layer) => layer.kind === 'delete' && layer.overlapParentId === parentInsert.id);
+    if (childDelete) {
+      return { parentInsert, childDelete };
+    }
+  }
+  return undefined;
 };
 
 /**
@@ -7088,7 +7107,8 @@ export class DomPainter {
     if (layers.length === 0) {
       return;
     }
-    const meta = textRun.trackedChange ?? layers[0];
+    const overlap = resolveInsertDeleteOverlap(layers);
+    const meta = overlap?.parentInsert ?? textRun.trackedChange ?? layers[0];
 
     layers.forEach((layer) => {
       const baseClass = TRACK_CHANGE_BASE_CLASS[layer.kind];
@@ -7102,6 +7122,10 @@ export class DomPainter {
       }
     });
 
+    if (overlap) {
+      elem.classList.add(TRACK_CHANGE_OVERLAP_INSERT_DELETE_CLASS);
+      elem.dataset.trackChangePreferredTargetId = overlap.childDelete.id;
+    }
     elem.dataset.trackChangeId = meta.id;
     elem.dataset.trackChangeKind = meta.kind;
     elem.dataset.trackChangeIds = layers.map((layer) => layer.id).join(',');

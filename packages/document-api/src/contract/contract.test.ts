@@ -331,6 +331,54 @@ describe('document-api contract catalog', () => {
     );
   });
 
+  it('publishes replacement as a first-class tracked-change type in list/get/extract schemas', () => {
+    const schemas = buildInternalContractSchemas();
+    const trackChangesListInput = schemas.operations['trackChanges.list'].input as {
+      properties?: {
+        type?: {
+          enum?: string[];
+        };
+      };
+    };
+    const trackChangesGetOutput = schemas.operations['trackChanges.get'].output as {
+      properties?: {
+        type?: {
+          enum?: string[];
+        };
+        grouping?: {
+          enum?: string[];
+        };
+      };
+    };
+    const extractOutput = schemas.operations.extract.output as {
+      properties?: {
+        trackedChanges?: {
+          items?: {
+            properties?: {
+              type?: {
+                enum?: string[];
+              };
+            };
+          };
+        };
+      };
+    };
+
+    expect(trackChangesListInput.properties?.type?.enum).toEqual(
+      expect.arrayContaining(['insert', 'delete', 'replacement', 'format']),
+    );
+    expect(trackChangesGetOutput.properties?.type?.enum).toEqual(
+      expect.arrayContaining(['insert', 'delete', 'replacement', 'format']),
+    );
+    expect(trackChangesGetOutput.properties?.grouping?.enum).toEqual(
+      expect.arrayContaining(['standalone', 'replacement-pair', 'unknown']),
+    );
+    expect(trackChangesGetOutput.properties?.grouping?.enum).not.toContain('aggregate');
+    expect(extractOutput.properties?.trackedChanges?.items?.properties?.type?.enum).toEqual(
+      expect.arrayContaining(['insert', 'delete', 'replacement', 'format']),
+    );
+  });
+
   it('includes global.history in capabilities.get output schema', () => {
     const schemas = buildInternalContractSchemas();
     const capabilitiesOutput = schemas.operations['capabilities.get'].output as {
