@@ -54,7 +54,7 @@ but have separate script chains because the validation needs differ.
 | `check:public` | `check:public:superdoc` + `check:public:docapi` | Both public interfaces. The umbrella to run before merging. |
 | `check:public:superdoc` | `check:public-contract` (legacy alias) | SuperDoc package: vite build + postbuild chain, consumer typecheck matrix, deep-type audit. |
 | `check:public:docapi` | `docapi:check` (legacy alias) | Document API: contract parity, generated outputs are not stale, examples compile, overview alignment. Clean-checkout safe: gitignored outputs (`packages/document-api/generated/`) are built in memory; tracked outputs (`apps/docs/document-api/reference/`, overview block) are still compared byte-for-byte. |
-| `report:public:superdoc` | `report:public-contract` (legacy alias) | Read-only tier metadata (supported / legacy / asset / deprecated). Not a gate. |
+| `report:public:superdoc` | `report:public-contract` (legacy alias) | Read-only tier metadata (supported / legacy / legacy-raw / asset / deprecated). Not a gate. |
 
 ### TypeScript compiler
 

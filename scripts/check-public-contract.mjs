@@ -4,36 +4,40 @@
  * TypeScript surface end-to-end.
  *
  * Stages:
- *   1. tier-discipline     - package.json#exports vs publicContract
- *                            tier coverage, routing, and legacy-raw
- *                            allowlist. Cheap (~10ms); runs first so
- *                            tier drift fails fast before the slow
- *                            build/matrix work.
- *   2. build:superdoc      - vite build + the postbuild validator chain
- *                            (check-tsconfig-type-surface, ensure-types,
- *                            audit-bundle, audit-declarations,
- *                            check-export-coverage, verify-public-facade-emit,
- *                            report-declaration-reachability).
- *                            Skipped when `--skip-build` is passed (CI calls
- *                            `pnpm run build` separately in its own step).
- *   3. typecheck-matrix    - packs superdoc + installs the tarball into
- *                            tests/consumer-typecheck/node_modules/, then
- *                            runs every consumer scenario.
- *   4. deep-type-audit     - strict gate on the supported-root public
- *                            surface (must be 0 findings). Reuses the
- *                            install that stage 3 produced (no `--pack`).
- *   5. package-shape       - publint + attw against the packed manifest
- *                            (reuses the tarball from stage 3).
- *   6. snapshots           - super-editor / legacy / root no-growth
- *                            snapshots (reuses the install).
- *   7. closure             - root-classification closure gate:
- *                            no supported-root/legacy-root export
- *                            references an internal-candidate type.
+ *   1. tier-discipline:test - unit tests for the pure tier validator.
+ *                             Cheap (~50ms). Verifies the validator
+ *                             catches every failure class before the
+ *                             next stage trusts its verdict.
+ *   2. tier-discipline      - package.json#exports vs publicContract
+ *                             tier coverage, routing, and legacy-raw
+ *                             allowlist. Cheap (~10ms); runs early so
+ *                             tier drift fails fast before the slow
+ *                             build/matrix work.
+ *   3. build:superdoc       - vite build + the postbuild validator chain
+ *                             (check-tsconfig-type-surface, ensure-types,
+ *                             audit-bundle, audit-declarations,
+ *                             check-export-coverage, verify-public-facade-emit,
+ *                             report-declaration-reachability).
+ *                             Skipped when `--skip-build` is passed (CI calls
+ *                             `pnpm run build` separately in its own step).
+ *   4. typecheck-matrix     - packs superdoc + installs the tarball into
+ *                             tests/consumer-typecheck/node_modules/, then
+ *                             runs every consumer scenario.
+ *   5. deep-type-audit      - strict gate on the supported-root public
+ *                             surface (must be 0 findings). Reuses the
+ *                             install that stage 4 produced (no `--pack`).
+ *   6. package-shape        - publint + attw against the packed manifest
+ *                             (reuses the tarball from stage 4).
+ *   7. snapshots            - super-editor / legacy / root no-growth
+ *                             snapshots (reuses the install).
+ *   8. closure              - root-classification closure gate:
+ *                             no supported-root/legacy-root export
+ *                             references an internal-candidate type.
  *
- * Matrix runs BEFORE stages 4-7 on purpose: it packs `superdoc.tgz`
- * and installs the tarball into the consumer fixture once. Stages 4,
- * 6, and 7 (deep-type-audit, snapshots, closure) reuse the installed
- * fixture; stage 5 (package-shape-gate) reuses the packed tarball
+ * Matrix runs BEFORE stages 5-8 on purpose: it packs `superdoc.tgz`
+ * and installs the tarball into the consumer fixture once. Stages 5,
+ * 7, and 8 (deep-type-audit, snapshots, closure) reuse the installed
+ * fixture; stage 6 (package-shape-gate) reuses the packed tarball
  * directly. Without this ordering each downstream stage would
  * `--pack` separately and multiply the work.
  *
@@ -60,6 +64,16 @@ const flags = new Set(process.argv.slice(2));
 const skipBuild = flags.has('--skip-build');
 
 const stages = [
+  {
+    name: 'tier-discipline:test',
+    cwd: REPO_ROOT,
+    cmd: 'node',
+    args: ['--test', 'scripts/check-public-contract-tiers.test.mjs'],
+    blurb:
+      'Unit tests for the pure tier validator. Cheap (~50ms); verifies ' +
+      'the validator catches every failure class before the next stage ' +
+      'trusts its verdict.',
+  },
   {
     name: 'tier-discipline',
     cwd: REPO_ROOT,
