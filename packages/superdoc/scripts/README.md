@@ -182,7 +182,8 @@ The four `check-*` scripts run together via `check:public:docapi`,
 which invokes the staged wrapper at `scripts/check-public-docapi.mjs`.
 Same shape as `check:public:superdoc`: cheap-to-expensive ordering,
 named stages (`contract-parity`, `contract-outputs`, `examples`,
-`overview-alignment`), per-stage timing, and a re-run hint on failure.
+`overview-alignment`), stage headers + final elapsed time, and a
+re-run hint on failure.
 
 **Clean-checkout safe**: a fresh `git clone` followed by `pnpm install
 && pnpm check:public` succeeds without `generate:docapi` having run
