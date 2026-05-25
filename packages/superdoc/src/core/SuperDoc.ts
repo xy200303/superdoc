@@ -2039,7 +2039,7 @@ export class SuperDoc extends EventEmitter<SuperDocEventMap> {
    * Get the HTML content of all editors
    * @returns {Array<string>} The HTML content of all editors
    */
-  getHTML(options = {}) {
+  getHTML(options: Parameters<Editor['getHTML']>[0] = {}) {
     const editors: Editor[] = [];
     this.#requireSuperdocStore('getHTML').documents.forEach((doc: RuntimeDocument) => {
       const editor = doc.getEditor?.();
