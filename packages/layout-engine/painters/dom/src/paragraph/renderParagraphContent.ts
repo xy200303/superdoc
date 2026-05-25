@@ -195,7 +195,14 @@ export const renderParagraphContent = (params: RenderParagraphContentParams): Re
           lineTopOffset: lineTopOffset + beforeHeight,
         });
   if (applySdtChrome) {
-    applyBlockSdtChromeBounds(frameEl, block, getRenderedContentLines(params), width, resolvedContent);
+    applyBlockSdtChromeBounds(
+      frameEl,
+      block,
+      getRenderedContentLines(params),
+      width,
+      lineIndexOffset + localStartLine,
+      resolvedContent,
+    );
   }
 
   let renderedHeight = renderResult.renderedHeight;
@@ -242,6 +249,7 @@ const applyBlockSdtChromeBounds = (
   block: ParagraphBlock,
   lines: Line[],
   fragmentWidth: number,
+  lineIndexBase: number,
   content?: ResolvedParagraphContent,
 ): void => {
   const sdt = getSdtContainerMetadata(block.attrs?.sdt, block.attrs?.containerSdt);
@@ -270,7 +278,9 @@ const applyBlockSdtChromeBounds = (
     const lineWidth = Math.max(0, line.naturalWidth ?? line.width ?? 0);
     if (lineWidth <= 0) continue;
 
-    const lineOffset = resolveBlockSdtChromeLineOffset(block, line, content?.lines[index], index);
+    const resolvedLine = content?.lines[index];
+    const lineIndex = resolvedLine?.lineIndex ?? lineIndexBase + index;
+    const lineOffset = resolveBlockSdtChromeLineOffset(block, line, resolvedLine, lineIndex);
     const alignmentSlack = Math.max(0, fragmentWidth - lineOffset - lineWidth);
     const alignment = block.attrs?.alignment;
     const lineLeft =
