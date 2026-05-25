@@ -58,6 +58,7 @@ export { createTheme } from '../core/theme/create-theme.js';
 
 // Type source: ./core/types/index.js
 export type { AwarenessState } from '../core/types/index.js';
+export type { AwarenessUser } from '../core/types/index.js';
 export type { BlockNavigationAddress } from '../core/types/index.js';
 export type { BookmarkAddress } from '../core/types/index.js';
 export type { CollaborationConfig } from '../core/types/index.js';

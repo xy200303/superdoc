@@ -3,8 +3,6 @@
   "knownUnmet": [
     "addCommentsList:parameters",
     "addCommentsList:returns",
-    "addSharedUser:parameters",
-    "addSharedUser:returns",
     "canPerformPermission:parameters",
     "canPerformPermission:returns",
     "closeSurface:parameters",
@@ -23,8 +21,6 @@
     "openSurface:parameters",
     "openSurface:returns",
     "removeCommentsList:returns",
-    "removeSharedUser:parameters",
-    "removeSharedUser:returns",
     "requiredNumberOfEditors:returns",
     "save:returns",
     "scrollToComment:parameters",

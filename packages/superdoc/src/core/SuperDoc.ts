@@ -62,6 +62,7 @@ const DEFAULT_AWARENESS_PALETTE = Object.freeze([
 // declared as interfaces below.
 import type {
   AwarenessState,
+  AwarenessUser,
   CollaborationProvider,
   Config,
   DocumentMode,
@@ -382,7 +383,7 @@ export class SuperDoc extends EventEmitter<SuperDocEventMap> {
   declare superdocId: string;
   declare comments: unknown[];
   declare socket: HocuspocusProviderWebsocket | null;
-  declare user: User;
+  declare user: AwarenessUser;
   declare _cleanupAwareness: (() => void) | null;
   declare _commentsCollabInitialized: boolean;
 

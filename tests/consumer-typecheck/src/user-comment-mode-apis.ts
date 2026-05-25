@@ -1,5 +1,5 @@
 /**
- * Consumer typecheck: comment + mode public APIs on `SuperDoc`.
+ * Consumer typecheck: comment + mode + shared-user public APIs on `SuperDoc`.
  *
  * Drains the second batch of obligations from the public-method
  * coverage gate (#3481). Each assertion locks the parameter or return
@@ -12,32 +12,28 @@
  *
  *   - `getComment(commentId)` → `Record<string, unknown> | null`
  *   - `setDocumentMode(type)` → `void`
+ *   - `addSharedUser(user)` → `void`
+ *   - `removeSharedUser(email)` → `void`
  *
- * `setDocumentMode` has no declared return type in source; TS infers
- * `void`, which the emitted `.d.ts` ships. The `void` assertion is
- * deliberate: it forces a future tightening that introduces a real
- * return value (e.g. `boolean`) to land as an intentional contract
- * change.
+ * The mutation methods have no declared return type in source; TS
+ * infers `void`, which the emitted `.d.ts` ships. The `void`
+ * assertion is deliberate: a future tightening that introduces a
+ * real return value (e.g. `boolean` for "found and removed") will
+ * fail this assertion and land as an intentional contract change.
  *
- * `addSharedUser` / `removeSharedUser` obligations are intentionally
- * deferred (still on the debt snapshot). Their parameter and return
- * types reference a different `User` interface than the one
- * `superdoc` re-exports publicly: the methods accept the internal
- * `User` from `packages/superdoc/src/core/types/index.ts`, while
- * `import { User } from 'superdoc'` resolves to the super-editor
- * `User` re-exported via `src/public/index.ts`. Strict `AssertEqual<>`
- * fails on this identity mismatch even though the shapes are
- * structurally similar. The right fix is upstream — unify the two
- * User types so the public consumer surface and the method signature
- * match — not loosen the fixture assertion class. Tracked as a
- * separate follow-up.
+ * `addSharedUser` / `removeSharedUser` previously failed identity
+ * equality on their `User` parameter because the methods accepted a
+ * SuperDoc-internal `User` interface that re-declared the public
+ * super-editor `User`. This PR unifies the two so the imported
+ * `User` from `superdoc` is the same symbol the methods accept.
  */
-import type { DocumentMode, SuperDoc } from 'superdoc';
+import type { DocumentMode, SuperDoc, User } from 'superdoc';
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type AssertEqual<A, B> = Equal<A, B> extends true ? true : never;
 
 declare const sd: SuperDoc;
+declare const realUser: User;
 
 // ─── getComment ─────────────────────────────────────────────────────
 // Looks up a comment by id in the comments Pinia store. Returns the
@@ -55,4 +51,27 @@ const _setDocumentModeReturnOk: AssertEqual<ReturnType<SuperDoc['setDocumentMode
 const editingMode: DocumentMode = 'editing';
 sd.setDocumentMode(editingMode);
 
-void [_getCommentParamsOk, _getCommentReturnOk, _commentValue, _setDocumentModeParamsOk, _setDocumentModeReturnOk];
+// ─── addSharedUser ──────────────────────────────────────────────────
+// No-op when the user's email is already present; otherwise appends to
+// `superdoc.users`. Return is `void`.
+const _addSharedUserParamsOk: AssertEqual<Parameters<SuperDoc['addSharedUser']>, [user: User]> = true;
+const _addSharedUserReturnOk: AssertEqual<ReturnType<SuperDoc['addSharedUser']>, void> = true;
+sd.addSharedUser(realUser);
+
+// ─── removeSharedUser ───────────────────────────────────────────────
+// Removes by email match. Silent on no-match. Return is `void`.
+const _removeSharedUserParamsOk: AssertEqual<Parameters<SuperDoc['removeSharedUser']>, [email: string]> = true;
+const _removeSharedUserReturnOk: AssertEqual<ReturnType<SuperDoc['removeSharedUser']>, void> = true;
+sd.removeSharedUser('user@example.com');
+
+void [
+  _getCommentParamsOk,
+  _getCommentReturnOk,
+  _commentValue,
+  _setDocumentModeParamsOk,
+  _setDocumentModeReturnOk,
+  _addSharedUserParamsOk,
+  _addSharedUserReturnOk,
+  _removeSharedUserParamsOk,
+  _removeSharedUserReturnOk,
+];

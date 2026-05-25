@@ -1,17 +1,17 @@
 # superdoc root export inventory (SD-3212 PR A0)
 
-Generated: 2026-05-23T12:40:30.787Z
+Generated: 2026-05-25T11:25:51.224Z
 Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 
 ## Counts
 
 | Source | Path | Count |
 |---|---|---|
-| types.import | `./dist/superdoc/src/public/index.d.ts` | 204 |
-| types.require | `./dist/superdoc/src/public/index.d.cts` | 204 |
+| types.import | `./dist/superdoc/src/public/index.d.ts` | 205 |
+| types.require | `./dist/superdoc/src/public/index.d.cts` | 205 |
 | import | `./dist/superdoc.es.js` | 41 |
 | require | `./dist/superdoc.cjs` | 41 |
-| **union** |  | **204** |
+| **union** |  | **205** |
 
 ## Divergences
 
@@ -19,12 +19,13 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 - types.require only (not in types.import): 0
 - ESM only (not in CJS): 0
 - CJS only (not in ESM): 0
-- typed but no runtime export (phantom risk): 163
+- typed but no runtime export (phantom risk): 164
 - runtime export but not typed (silent shadow on root): 0
 
 ### Type-only names (no runtime)
 
 - `AwarenessState`
+- `AwarenessUser`
 - `BinaryData`
 - `BlockNavigationAddress`
 - `BlocksListResult`
@@ -195,6 +196,7 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 | `AIWriter` | ✓ | ✓ | ✓ | ✓ | 1 |   | 0 | 0 | 4 |   |
 | `AnnotatorHelpers` | ✓ | ✓ | ✓ | ✓ | 1 |   | 0 | 0 | 1 |   |
 | `AwarenessState` | ✓ | ✓ |   |   | 3 | ✓ | 0 | 0 | 0 |   |
+| `AwarenessUser` | ✓ | ✓ |   |   | 0 |   | 0 | 0 | 0 |   |
 | `BinaryData` | ✓ | ✓ |   |   | 3 | ✓ | 0 | 0 | 0 |   |
 | `BlankDOCX` | ✓ | ✓ | ✓ | ✓ | 0 |   | 0 | 0 | 1 |   |
 | `BlockNavigationAddress` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
@@ -228,7 +230,7 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 | `DirectSurfaceRequest` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
 | `DocRange` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
 | `DocumentApi` | ✓ | ✓ |   |   | 3 | ✓ | 0 | 8 | 4 | ✓ |
-| `DocumentMode` | ✓ | ✓ |   |   | 2 | ✓ | 2 | 16 | 3 |   |
+| `DocumentMode` | ✓ | ✓ |   |   | 3 | ✓ | 2 | 16 | 3 |   |
 | `DocumentProtectionState` | ✓ | ✓ |   |   | 1 | ✓ | 1 | 0 | 1 |   |
 | `DocxFileEntry` | ✓ | ✓ |   |   | 3 | ✓ | 0 | 0 | 0 |   |
 | `DocxZipper` | ✓ | ✓ | ✓ | ✓ | 2 |   | 0 | 0 | 1 | ✓ |
@@ -282,7 +284,7 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 | `ListDefinitionsPayload` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
 | `Measure` | ✓ | ✓ |   |   | 3 | ✓ | 0 | 0 | 1 |   |
 | `Modules` | ✓ | ✓ |   |   | 1 | ✓ | 4 | 0 | 0 |   |
-| `NavigableAddress` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
+| `NavigableAddress` | ✓ | ✓ |   |   | 2 | ✓ | 0 | 0 | 0 |   |
 | `OpenOptions` | ✓ | ✓ |   |   | 3 | ✓ | 1 | 0 | 0 |   |
 | `PDF` | ✓ | ✓ | ✓ | ✓ | 2 |   | 35 | 0 | 1 | ✓ |
 | `PageMargins` | ✓ | ✓ |   |   | 3 | ✓ | 0 | 0 | 0 |   |
@@ -339,11 +341,11 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 | `SlashMenu` | ✓ | ✓ | ✓ | ✓ | 1 |   | 0 | 0 | 1 |   |
 | `StoryLocator` | ✓ | ✓ |   |   | 1 | ✓ | 116 | 0 | 3 |   |
 | `SuperConverter` | ✓ | ✓ | ✓ | ✓ | 1 |   | 0 | 0 | 3 | ✓ |
-| `SuperDoc` | ✓ | ✓ | ✓ | ✓ | 11 |   | 1014 | 180 | 244 | ✓ |
-| `SuperDocExceptionEditorPayload` | ✓ | ✓ |   |   | 1 |   | 0 | 0 | 0 |   |
-| `SuperDocExceptionPayload` | ✓ | ✓ |   |   | 1 |   | 0 | 0 | 0 |   |
-| `SuperDocExceptionRestorePayload` | ✓ | ✓ |   |   | 0 |   | 0 | 0 | 0 |   |
-| `SuperDocExceptionStorePayload` | ✓ | ✓ |   |   | 1 |   | 0 | 0 | 0 |   |
+| `SuperDoc` | ✓ | ✓ | ✓ | ✓ | 13 |   | 1014 | 180 | 244 | ✓ |
+| `SuperDocExceptionEditorPayload` | ✓ | ✓ |   |   | 2 |   | 0 | 0 | 0 |   |
+| `SuperDocExceptionPayload` | ✓ | ✓ |   |   | 2 |   | 0 | 0 | 0 |   |
+| `SuperDocExceptionRestorePayload` | ✓ | ✓ |   |   | 1 |   | 0 | 0 | 0 |   |
+| `SuperDocExceptionStorePayload` | ✓ | ✓ |   |   | 2 |   | 0 | 0 | 0 |   |
 | `SuperDocLayoutEngineOptions` | ✓ | ✓ |   |   | 2 | ✓ | 0 | 0 | 0 |   |
 | `SuperDocTelemetryConfig` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
 | `SuperEditor` | ✓ | ✓ | ✓ | ✓ | 1 |   | 16 | 0 | 5 |   |
@@ -371,7 +373,7 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 | `Transaction` | ✓ | ✓ |   |   | 3 | ✓ | 5 | 0 | 0 | ✓ |
 | `UnsupportedContentItem` | ✓ | ✓ |   |   | 3 | ✓ | 0 | 0 | 0 |   |
 | `UpgradeToCollaborationOptions` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
-| `User` | ✓ | ✓ |   |   | 4 | ✓ | 51 | 8 | 30 |   |
+| `User` | ✓ | ✓ |   |   | 5 | ✓ | 51 | 8 | 30 |   |
 | `ViewLayout` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
 | `ViewOptions` | ✓ | ✓ |   |   | 1 | ✓ | 2 | 0 | 0 |   |
 | `ViewingVisibilityConfig` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |

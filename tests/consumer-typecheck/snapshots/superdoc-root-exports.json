@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-23T12:40:30.787Z",
+  "generatedAt": "2026-05-25T11:25:51.224Z",
   "ticket": "SD-3212 PR A0",
   "package": "superdoc",
   "rootExport": {
@@ -17,6 +17,7 @@
         "AIWriter",
         "AnnotatorHelpers",
         "AwarenessState",
+        "AwarenessUser",
         "BinaryData",
         "BlankDOCX",
         "BlockNavigationAddress",
@@ -227,6 +228,7 @@
         "AIWriter",
         "AnnotatorHelpers",
         "AwarenessState",
+        "AwarenessUser",
         "BinaryData",
         "BlankDOCX",
         "BlockNavigationAddress",
@@ -527,11 +529,11 @@
     }
   },
   "counts": {
-    "types.import": 204,
-    "types.require": 204,
+    "types.import": 205,
+    "types.require": 205,
     "import": 41,
     "require": 41,
-    "union": 204
+    "union": 205
   },
   "divergences": {
     "typesImportVsRequire": {
@@ -545,6 +547,7 @@
     "typesVsRuntime": {
       "typedOnly": [
         "AwarenessState",
+        "AwarenessUser",
         "BinaryData",
         "BlockNavigationAddress",
         "BlocksListResult",
