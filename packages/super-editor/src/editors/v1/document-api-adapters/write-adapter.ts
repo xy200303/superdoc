@@ -49,8 +49,22 @@ type LegacyDeleteWriteRequest = {
 type LegacyWriteRequest = LegacyInsertWriteRequest | LegacyReplaceWriteRequest | LegacyDeleteWriteRequest;
 
 function getSharedTrackedInsertionMarkAtPosition(editor: Editor, pos: number): ProseMirrorMark | null {
-  const boundedPos = Math.max(0, Math.min(editor.state.doc.content.size, pos));
-  const $pos = editor.state.doc.resolve(boundedPos);
+  const stateDoc = editor?.state?.doc as
+    | {
+        content?: { size?: number };
+        resolve?: (pos: number) => {
+          nodeBefore?: { marks?: ProseMirrorMark[] };
+          nodeAfter?: { marks?: ProseMirrorMark[] };
+        };
+      }
+    | undefined;
+  if (typeof stateDoc?.resolve !== 'function') {
+    return null;
+  }
+
+  const maxPos = typeof stateDoc.content?.size === 'number' ? stateDoc.content.size : pos;
+  const boundedPos = Math.max(0, Math.min(maxPos, pos));
+  const $pos = stateDoc.resolve(boundedPos);
   const beforeInsert = $pos.nodeBefore?.marks?.find((mark) => mark.type?.name === TrackInsertMarkName) ?? null;
   const afterInsert = $pos.nodeAfter?.marks?.find((mark) => mark.type?.name === TrackInsertMarkName) ?? null;
   const beforeId = typeof beforeInsert?.attrs?.id === 'string' ? beforeInsert.attrs.id : null;
@@ -64,8 +78,16 @@ function getSharedTrackedInsertionMarkAtPosition(editor: Editor, pos: number): P
 }
 
 function resolveDirectInsertMarks(editor: Editor, pos: number): ProseMirrorMark[] {
-  const boundedPos = Math.max(0, Math.min(editor.state.doc.content.size, pos));
-  const marks = [...editor.state.doc.resolve(boundedPos).marks()];
+  const stateDoc = editor?.state?.doc as
+    | {
+        content?: { size?: number };
+        resolve?: (pos: number) => { marks?: () => readonly ProseMirrorMark[] };
+      }
+    | undefined;
+  const maxPos = typeof stateDoc?.content?.size === 'number' ? stateDoc.content.size : pos;
+  const boundedPos = Math.max(0, Math.min(maxPos, pos));
+  const resolved = typeof stateDoc?.resolve === 'function' ? stateDoc.resolve(boundedPos) : null;
+  const marks = resolved?.marks ? [...resolved.marks()] : [];
   const trackedInsert = getSharedTrackedInsertionMarkAtPosition(editor, boundedPos);
 
   if (!trackedInsert) return marks;

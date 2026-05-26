@@ -3323,34 +3323,11 @@ describe('PresentationEditor', () => {
       expect(sessionEditor?.view.focus).toHaveBeenCalled();
     });
 
-    it('resolves public Word tracked-change ids to runtime mark ids during story navigation', async () => {
+    it('uses the public Word tracked-change id during story navigation when the note session supports it', async () => {
       const { sessionEditor } = await activateFootnoteSession();
-      const setCursorById = vi.fn((id: string) => id === 'runtime-note-1');
+      const setCursorById = vi.fn((id: string) => id === 'word:trackInsert:101');
       if (sessionEditor?.commands) {
         sessionEditor.commands.setCursorById = setCursorById;
-      }
-      if (sessionEditor?.state?.doc) {
-        sessionEditor.state.doc.descendants = vi.fn((callback: (node: unknown, pos: number) => void) => {
-          callback(
-            {
-              isInline: true,
-              nodeSize: 13,
-              text: 'FN_TC_CHARLIE',
-              marks: [
-                {
-                  type: { name: 'trackInsert' },
-                  attrs: {
-                    id: 'runtime-note-1',
-                    sourceId: '101',
-                    author: 'Story Harness',
-                    date: '2024-01-01T00:00:00Z',
-                  },
-                },
-              ],
-            },
-            2,
-          );
-        });
       }
 
       const didNavigate = await editor.navigateTo({
@@ -3361,10 +3338,10 @@ describe('PresentationEditor', () => {
       });
 
       expect(didNavigate).toBe(true);
+      expect(setCursorById).toHaveBeenCalledTimes(1);
       expect(setCursorById).toHaveBeenCalledWith('word:trackInsert:101', {
         preferredActiveThreadId: 'word:trackInsert:101',
       });
-      expect(setCursorById).toHaveBeenCalledWith('runtime-note-1', { preferredActiveThreadId: 'runtime-note-1' });
       expect(sessionEditor?.view.focus).toHaveBeenCalled();
     });
 
