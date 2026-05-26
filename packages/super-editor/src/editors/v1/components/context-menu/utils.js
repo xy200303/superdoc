@@ -227,7 +227,7 @@ export async function getEditorContext(editor, event) {
     node,
     event,
     trigger: event ? 'click' : 'slash',
-    editor,
+    editor: markRaw(editor),
     trackedChanges,
     proofingContext,
     tocAncestor,
