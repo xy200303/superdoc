@@ -1569,6 +1569,21 @@ export type ParagraphAttrs = {
   /** Marks an empty paragraph that only exists to carry section properties. */
   sectPrMarker?: boolean;
   /**
+   * The paragraph break should not produce a visible line break: the next
+   * paragraph's runs fuse into this block during pm-adapter post-processing
+   * and the successor's auto-generated list marker disappears with it.
+   * Numbering counters on subsequent paragraphs still advance per OOXML
+   * paragraph, matching Word.
+   *
+   * Triggered by `w:vanish` on the paragraph-mark rPr (`w:pPr/w:rPr`).
+   * ECMA-376 §17.3.2.36 reads as if `w:specVanish` is the trigger ("a
+   * paragraph mark shall never be used to break the end of a paragraph for
+   * display"), but Word 16.0 fuses on `w:vanish` and leaves `w:specVanish`
+   * standalone as a no-op for the paragraph break (SD-3269 fixture matrix).
+   * Matching Word, not the literal spec, is the rendering goal.
+   */
+  suppressParagraphBreak?: boolean;
+  /**
    * Resolved direction context for the paragraph (inline direction + writing mode).
    * Single source of truth for paragraph direction-aware rendering decisions.
    *
