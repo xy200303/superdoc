@@ -1052,7 +1052,7 @@ export class SuperDoc extends EventEmitter<SuperDocEventMap> {
    *
    * @returns {Promise<void>} Resolves once the collaborative runtime is ready
    */
-  async upgradeToCollaboration({ ydoc, provider }: UpgradeToCollaborationOptions) {
+  async upgradeToCollaboration({ ydoc, provider }: UpgradeToCollaborationOptions): Promise<void> {
     this.#validateUpgradePrerequisites({ ydoc, provider });
     this.#isUpgrading = true;
 
@@ -2011,7 +2011,7 @@ export class SuperDoc extends EventEmitter<SuperDocEventMap> {
   /**
    * Set the document to locked or unlocked
    */
-  setLocked(lock = true) {
+  setLocked(lock = true): void {
     this.config.documents.forEach((doc: RuntimeDocument) => {
       // setLocked is a collaboration-only API; the surrounding flow only
       // calls it once each document has a Yjs doc attached. Cast away the
@@ -2043,10 +2043,13 @@ export class SuperDoc extends EventEmitter<SuperDocEventMap> {
   }
 
   /**
-   * Lock the current superdoc
-   * @param {User} lockedBy The user who locked the superdoc
+   * Lock the current superdoc and emit the `locked` event.
+   *
+   * @param {boolean} [isLocked] Whether the superdoc is locked. Defaults to `false`.
+   * @param {User | null} [lockedBy] The user who locked the superdoc, or `null`
+   *   when unlocking (or when no user is known). Defaults to `null`.
    */
-  lockSuperdoc(isLocked: boolean = false, lockedBy: User | null = null) {
+  lockSuperdoc(isLocked: boolean = false, lockedBy: User | null = null): void {
     this.isLocked = isLocked;
     this.lockedBy = lockedBy;
     this.#log('🦋 [superdoc] Locking superdoc:', isLocked, lockedBy, '\n\n\n');
