@@ -5,28 +5,7 @@ import { applyImageClipPath, readImageClipPathValue } from '../images/image-clip
 import type { RunRenderContext } from './types.js';
 import { applyRunDataAttributes } from './hash.js';
 import { sanitizeUrl } from './links.js';
-import { IMAGE_DATA_URL_MIME_TYPES, MAX_IMAGE_DATA_URL_LENGTH } from '@superdoc/url-validation';
-
-export function isValidImageDataUrl(src: string): boolean {
-  if (!src.startsWith('data:') || src.length > MAX_IMAGE_DATA_URL_LENGTH) {
-    return false;
-  }
-
-  const metadataEnd = src.indexOf(',');
-  if (metadataEnd === -1) {
-    return false;
-  }
-
-  const metadata = src.slice('data:'.length, metadataEnd);
-  const [rawMimeType = '', ...rawParameters] = metadata.split(';');
-  const mimeType = rawMimeType.toLowerCase();
-  if (!IMAGE_DATA_URL_MIME_TYPES.includes(mimeType)) {
-    return false;
-  }
-
-  const isBase64 = rawParameters.some((parameter) => parameter.toLowerCase() === 'base64');
-  return isBase64 || mimeType === 'image/svg+xml';
-}
+import { isValidImageDataUrl } from '@superdoc/url-validation';
 
 /**
  * Maximum resize multiplier for image metadata.
@@ -374,4 +353,4 @@ export const renderImageRun = (run: ImageRun, context: RunRenderContext): HTMLEl
   return context.buildImageHyperlinkAnchor(img, run.hyperlink, 'inline-block');
 };
 
-export { MAX_IMAGE_DATA_URL_LENGTH };
+export { isValidImageDataUrl };
