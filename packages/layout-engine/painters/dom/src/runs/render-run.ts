@@ -5,7 +5,7 @@ import type { RunRenderContext, TrackedChangesRenderConfig } from './types.js';
 import { renderFieldAnnotationRun } from './field-annotation-run.js';
 import { renderImageRun } from './image-run.js';
 import { renderMathRun } from './math-run.js';
-import { renderTextRun } from './text-run.js';
+import { applyRunStyles, renderTextRun } from './text-run.js';
 
 export const isImageRun = (run: Run): run is ImageRun => run.kind === 'image';
 export const isLineBreakRun = (run: Run): run is import('@superdoc/contracts').LineBreakRun => run.kind === 'lineBreak';
@@ -27,6 +27,7 @@ const renderEmptySdtPlaceholderRun = (run: TextRun, renderContext: RunRenderCont
   if (run.pmStart != null) elem.dataset.pmStart = String(run.pmStart);
   if (run.pmEnd != null) elem.dataset.pmEnd = String(run.pmEnd);
   renderContext.applySdtDataset(elem, run.sdt);
+  applyRunStyles(elem, run);
   return elem;
 };
 
