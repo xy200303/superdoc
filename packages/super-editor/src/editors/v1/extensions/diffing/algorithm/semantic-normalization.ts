@@ -233,3 +233,81 @@ function normalizeDocNodeJSON(nodeJSON: Record<string, unknown>): Record<string,
   }
   return nodeJSON;
 }
+
+// ---------------------------------------------------------------------------
+// Legacy normalization (SD-3279 backward compatibility)
+//
+// Reproduces the pre-SD-3279 normalization exactly. Used only by the
+// validation fallback path in `diff-service.ts` to accept snapshot and diff
+// payloads captured under the old algorithm. The difference from the current
+// algorithm: paragraph-only attribute stripping over a smaller set (no
+// `sdBlockId` / `sdBlockRev`), no attribute stripping on structural
+// containers. Image originalAttributes stripping is unchanged across both
+// algorithms and is reused.
+// ---------------------------------------------------------------------------
+
+const LEGACY_VOLATILE_PARAGRAPH_ATTRS = new Set<string>([
+  'paraId',
+  'textId',
+  'rsidR',
+  'rsidRDefault',
+  'rsidP',
+  'rsidRPr',
+  'rsidDel',
+]);
+
+function normalizeParagraphAttrsLegacy(attrs: Record<string, unknown>): Record<string, unknown> {
+  return omitKeys(attrs, LEGACY_VOLATILE_PARAGRAPH_ATTRS);
+}
+
+function normalizeParagraphNodeJSONLegacy(nodeJSON: Record<string, unknown>): Record<string, unknown> {
+  const attrs = (nodeJSON.attrs as Record<string, unknown>) ?? {};
+  const content = nodeJSON.content as Record<string, unknown>[] | undefined;
+
+  return {
+    ...nodeJSON,
+    attrs: normalizeParagraphAttrsLegacy(attrs),
+    ...(content ? { content: content.map(normalizeContentNodeJSON) } : {}),
+  };
+}
+
+function normalizeDocNodeJSONLegacy(nodeJSON: Record<string, unknown>): Record<string, unknown> {
+  const type = nodeJSON.type as string | undefined;
+
+  if (type === 'paragraph') {
+    return normalizeParagraphNodeJSONLegacy(nodeJSON);
+  }
+
+  // Pre-SD-3279: structural containers passed through with attrs untouched;
+  // only their content was recursed.
+  const content = nodeJSON.content as Record<string, unknown>[] | undefined;
+  if (content) {
+    return {
+      ...nodeJSON,
+      content: content.map(normalizeDocNodeJSONLegacy),
+    };
+  }
+
+  return nodeJSON;
+}
+
+/**
+ * Reproduces the pre-SD-3279 document normalization for legacy fingerprint
+ * validation. Used by `diff-service.ts` as a fallback when a snapshot or diff
+ * payload was captured under the old algorithm and its stored fingerprint
+ * would not match the current normalizer.
+ *
+ * @param docJSON Serialized document (from `doc.toJSON()`).
+ * @returns Normalized copy matching the pre-SD-3279 algorithm.
+ */
+export function normalizeDocJSONLegacy(docJSON: Record<string, unknown>): Record<string, unknown> {
+  const content = docJSON.content as Record<string, unknown>[] | undefined;
+  if (!content) {
+    return docJSON;
+  }
+
+  return {
+    ...docJSON,
+    content: content.map(normalizeDocNodeJSONLegacy),
+  };
+}
