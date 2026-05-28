@@ -69,6 +69,28 @@ function checkLockViolation(sdtNodes, from, to) {
   return { blocked: false };
 }
 
+function isAtBlockSdtWrapperDeletePosition(state, sdt, pos) {
+  if (sdt.type !== 'structuredContentBlock') return false;
+
+  const $pos = state.doc.resolve(pos);
+  let sdtDepth = null;
+  for (let depth = $pos.depth; depth > 0; depth -= 1) {
+    if ($pos.node(depth).type.name === 'structuredContentBlock' && $pos.before(depth) === sdt.pos) {
+      sdtDepth = depth;
+      break;
+    }
+  }
+  if (sdtDepth == null) return false;
+
+  const textblockDepth = sdtDepth + 1;
+  if ($pos.depth < textblockDepth) return false;
+  if (!$pos.node(textblockDepth).isTextblock) return false;
+  if ($pos.node(textblockDepth).type.name !== 'paragraph') return false;
+  if ($pos.pos !== $pos.start(textblockDepth)) return false;
+
+  return $pos.before(textblockDepth) === $pos.start(sdtDepth);
+}
+
 export function createStructuredContentLockPlugin() {
   return new Plugin({
     key: STRUCTURED_CONTENT_LOCK_KEY,
@@ -164,6 +186,13 @@ export function createStructuredContentLockPlugin() {
               view.dispatch(state.tr.delete(emptyInlineSDT.pos, emptyInlineSDT.end));
             }
             return true;
+          }
+
+          const blockSdtAtWrapperDeletePosition = sdtNodes.find((s) =>
+            isAtBlockSdtWrapperDeletePosition(state, s, from),
+          );
+          if ((isBackspace || isDelete) && blockSdtAtWrapperDeletePosition) {
+            return false;
           }
 
           const inlineSdtAncestor = sdtNodes.find(

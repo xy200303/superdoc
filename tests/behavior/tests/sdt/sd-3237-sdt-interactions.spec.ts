@@ -28,31 +28,33 @@ async function getTextPoint(
 ): Promise<{ x: number; y: number }> {
   return page.evaluate(
     ({ selector, text, offset, occurrence }) => {
-      const root = document.querySelector(selector);
-      if (!root) throw new Error(`Element not found: ${selector}`);
-
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       let seen = 0;
-      let node = walker.nextNode() as Text | null;
-      while (node) {
-        const index = node.data.indexOf(text);
-        if (index !== -1) {
-          if (seen !== occurrence) {
-            seen += 1;
-            node = walker.nextNode() as Text | null;
-            continue;
+      const roots = Array.from(document.querySelectorAll(selector));
+      if (!roots.length) throw new Error(`Element not found: ${selector}`);
+
+      for (const root of roots) {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        let node = walker.nextNode() as Text | null;
+        while (node) {
+          const index = node.data.indexOf(text);
+          if (index !== -1) {
+            if (seen !== occurrence) {
+              seen += 1;
+              node = walker.nextNode() as Text | null;
+              continue;
+            }
+            const start = Math.min(index + offset, node.data.length - 1);
+            const range = document.createRange();
+            range.setStart(node, start);
+            range.setEnd(node, Math.min(start + 1, node.data.length));
+            const rect = range.getBoundingClientRect();
+            range.detach();
+            if (rect.width || rect.height) {
+              return { x: rect.left + 1, y: rect.top + rect.height / 2 };
+            }
           }
-          const start = Math.min(index + offset, node.data.length - 1);
-          const range = document.createRange();
-          range.setStart(node, start);
-          range.setEnd(node, Math.min(start + 1, node.data.length));
-          const rect = range.getBoundingClientRect();
-          range.detach();
-          if (rect.width || rect.height) {
-            return { x: rect.left + 1, y: rect.top + rect.height / 2 };
-          }
+          node = walker.nextNode() as Text | null;
         }
-        node = walker.nextNode() as Text | null;
       }
 
       throw new Error(`Text occurrence not found: ${text} (${occurrence})`);

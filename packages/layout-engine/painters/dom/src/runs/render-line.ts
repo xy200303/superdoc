@@ -55,11 +55,7 @@ const isWhitespaceOnly = (text: string): boolean => {
   return true;
 };
 
-const alignNormalTextBesideInlineImage = (
-  element: HTMLElement,
-  run: Run,
-  lineContainsInlineImage: boolean,
-): void => {
+const alignNormalTextBesideInlineImage = (element: HTMLElement, run: Run, lineContainsInlineImage: boolean): void => {
   if (!lineContainsInlineImage) return;
   if ((run.kind !== 'text' && run.kind !== undefined) || !('text' in run)) return;
 
@@ -522,6 +518,9 @@ const renderExplicitlyPositionedRuns = ({
         geoSdtWrapper.style.top = '0px';
         geoSdtWrapper.style.height = `${line.lineHeight}px`;
       }
+      if (isImageRun(runForSdt)) {
+        geoSdtWrapper.dataset.containsInlineImage = 'true';
+      }
       runContext.syncInlineSdtWrapperTypography(geoSdtWrapper, runForSdt);
       elem.style.left = `${elemLeftPx - geoSdtWrapperLeft}px`;
       geoSdtMaxRight = Math.max(geoSdtMaxRight, elemLeftPx + elemWidthPx);
@@ -770,6 +769,9 @@ const renderInlineRuns = ({
           }
           runContext.syncInlineSdtWrapperTypography(currentInlineSdtWrapper, run);
           currentInlineSdtId = runSdtId;
+        }
+        if (isImageRun(run)) {
+          currentInlineSdtWrapper.dataset.containsInlineImage = 'true';
         }
         // Typography is set when wrapper is created from the first run.
         // Follow-up (SD-2744): define a deterministic mixed-typography rule.

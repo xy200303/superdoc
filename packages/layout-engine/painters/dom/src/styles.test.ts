@@ -40,16 +40,21 @@ describe('ensureSdtContainerStyles', () => {
 
     expect(blockRule).not.toContain('padding:');
     expect(blockRule).not.toContain('border:');
+    expect(blockRule).toContain('background-color: transparent;');
     expect(blockRule).toContain('--sd-sdt-chrome-left: 0px;');
     expect(blockRule).toContain('--sd-sdt-chrome-width: 100%;');
     expect(blockRule).toContain('--sd-sdt-chrome-bottom-extension: 0px;');
+    expect(blockRule).toContain('z-index: 0;');
     expect(backgroundRule).toContain('width: var(--sd-sdt-chrome-width, 100%);');
     expect(backgroundRule).toContain('bottom: calc(0px - var(--sd-sdt-chrome-bottom-extension, 0px));');
+    expect(backgroundRule).toContain('background-color: var(--sd-content-controls-block-bg, transparent);');
+    expect(backgroundRule).toContain('z-index: -1;');
     expect(hoverRule).toContain('background-color: var(--sd-content-controls-block-hover-bg, #f2f2f2);');
     expect(chromeRule).toContain('position: absolute;');
     expect(chromeRule).toContain('width: var(--sd-sdt-chrome-width, 100%);');
     expect(chromeRule).toContain('bottom: calc(0px - var(--sd-sdt-chrome-bottom-extension, 0px));');
     expect(chromeRule).toContain('border: 1px solid transparent;');
+    expect(chromeRule).toContain('z-index: 1;');
     expect(chromeRule).toContain('pointer-events: none;');
   });
 
@@ -81,6 +86,22 @@ describe('ensureSdtContainerStyles', () => {
     expect(cssText).toContain('border-color: var(--sd-content-controls-inline-border, #629be7);');
     expect(emptyRule).not.toContain('display: inline-block');
     expect(emptyRule).not.toContain('vertical-align');
+  });
+
+  it('promotes only image-bearing inline SDT wrappers to inline-block geometry', () => {
+    ensureSdtContainerStyles(document);
+
+    const styleEl = document.querySelector('[data-superdoc-sdt-container-styles="true"]');
+    const cssText = styleEl?.textContent ?? '';
+    const baseInlineRule = cssText.match(/\.superdoc-structured-content-inline\s*\{([^}]*)\}/)?.[1] ?? '';
+    const imageInlineRule =
+      cssText.match(
+        /\.superdoc-structured-content-inline\[data-contains-inline-image='true'\]:not\(\[data-appearance='hidden'\]\)\s*\{([^}]*)\}/,
+      )?.[1] ?? '';
+
+    expect(baseInlineRule).toContain('display: inline;');
+    expect(imageInlineRule).toContain('display: inline-block;');
+    expect(imageInlineRule).toContain('vertical-align: top;');
   });
 
   it('uses the same label box model for block and inline SDTs', () => {
@@ -221,6 +242,23 @@ describe('ensureSdtContainerStyles', () => {
     );
     expect(cssText).toContain('background: none;');
     expect(beforeRule).toContain('background: none;');
+  });
+
+  it('suppresses block SDT resting background paint in viewing and print modes', () => {
+    ensureSdtContainerStyles(document);
+
+    const styleEl = document.querySelector('[data-superdoc-sdt-container-styles="true"]');
+    const cssText = styleEl?.textContent ?? '';
+    const viewingBeforeRule =
+      cssText.match(
+        /\.presentation-editor--viewing \.superdoc-structured-content-block::before,[\s\S]*?\{([^}]*)\}/,
+      )?.[1] ?? '';
+    const printBeforeRule =
+      cssText.match(/@media print\s*\{[\s\S]*?\.superdoc-structured-content-block::before\s*\{([^}]*)\}/)?.[1] ?? '';
+
+    expect(cssText).toContain('.presentation-editor--viewing .superdoc-structured-content-block::before,');
+    expect(viewingBeforeRule).toContain('background: none;');
+    expect(printBeforeRule).toContain('background: none;');
   });
 
   it('keeps hidden-appearance inline SDTs transparent at rest', () => {

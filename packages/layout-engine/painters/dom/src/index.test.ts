@@ -2738,6 +2738,7 @@ describe('DomPainter', () => {
     expect(wrapper.dataset.sdtScope).toBe('inline');
     expect(wrapper.dataset.sdtId).toBe('sc-inline-1');
     expect(wrapper.dataset.sdtTag).toBe('dropdown');
+    expect(wrapper.dataset.containsInlineImage).toBeUndefined();
 
     // The wrapper should span all contained runs (pmStart=7 to pmEnd=22)
     expect(wrapper.dataset.pmStart).toBe('7');
@@ -2753,6 +2754,108 @@ describe('DomPainter', () => {
 
     // Verify text content (label text + run text)
     expect(wrapper.textContent).toContain('controlled text');
+  });
+
+  it('marks inline structuredContent wrappers that contain inline images', () => {
+    const block: FlowBlock = {
+      kind: 'paragraph',
+      id: 'inline-sc-image',
+      runs: [
+        { text: 'Before ', fontFamily: 'Arial', fontSize: 16, pmStart: 0, pmEnd: 7 },
+        {
+          text: 'Caption ',
+          fontFamily: 'Arial',
+          fontSize: 16,
+          pmStart: 7,
+          pmEnd: 15,
+          sdt: {
+            type: 'structuredContent',
+            scope: 'inline',
+            id: 'sc-inline-image',
+            alias: 'Image control',
+          },
+        },
+        {
+          kind: 'image',
+          src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          width: 40,
+          height: 40,
+          pmStart: 15,
+          pmEnd: 16,
+          sdt: {
+            type: 'structuredContent',
+            scope: 'inline',
+            id: 'sc-inline-image',
+            alias: 'Image control',
+          },
+        },
+        {
+          text: ' after',
+          fontFamily: 'Arial',
+          fontSize: 16,
+          pmStart: 16,
+          pmEnd: 22,
+          sdt: {
+            type: 'structuredContent',
+            scope: 'inline',
+            id: 'sc-inline-image',
+            alias: 'Image control',
+          },
+        },
+      ],
+      attrs: {},
+    };
+
+    const measure: Measure = {
+      kind: 'paragraph',
+      lines: [
+        {
+          fromRun: 0,
+          fromChar: 0,
+          toRun: 3,
+          toChar: 6,
+          width: 160,
+          ascent: 40,
+          descent: 0,
+          lineHeight: 40,
+        },
+      ],
+      totalHeight: 40,
+    };
+
+    const layout: Layout = {
+      pageSize: { w: 612, h: 792 },
+      pages: [
+        {
+          number: 1,
+          fragments: [
+            {
+              kind: 'para',
+              blockId: 'inline-sc-image',
+              fromLine: 0,
+              toLine: 1,
+              x: 30,
+              y: 40,
+              width: 552,
+              pmStart: 0,
+              pmEnd: 22,
+            },
+          ],
+        },
+      ],
+    };
+
+    const painter = createTestPainter({ blocks: [block], measures: [measure] });
+    painter.paint(layout, mount);
+
+    const wrapper = mount.querySelector(
+      '.superdoc-structured-content-inline[data-sdt-id="sc-inline-image"]',
+    ) as HTMLElement | null;
+    expect(wrapper).toBeTruthy();
+    expect(wrapper?.dataset.containsInlineImage).toBe('true');
+    expect(wrapper?.querySelector('.superdoc-inline-image')).toBeTruthy();
+    expect(wrapper?.dataset.pmStart).toBe('7');
+    expect(wrapper?.dataset.pmEnd).toBe('22');
   });
 
   it('omits chrome and alias label when inline SDT appearance is hidden (SD-3110)', () => {

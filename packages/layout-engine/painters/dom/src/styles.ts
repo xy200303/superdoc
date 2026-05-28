@@ -525,8 +525,9 @@ const SDT_CONTAINER_STYLES = `
 .superdoc-structured-content-block {
   box-sizing: border-box;
   border-radius: 4px;
-  background-color: var(--sd-content-controls-block-bg, transparent);
+  background-color: transparent;
   position: relative;
+  z-index: 0;
   --sd-sdt-chrome-left: 0px;
   --sd-sdt-chrome-width: 100%;
   --sd-sdt-chrome-bottom-extension: 0px;
@@ -540,7 +541,9 @@ const SDT_CONTAINER_STYLES = `
   bottom: calc(0px - var(--sd-sdt-chrome-bottom-extension, 0px));
   width: var(--sd-sdt-chrome-width, 100%);
   border-radius: inherit;
+  background-color: var(--sd-content-controls-block-bg, transparent);
   box-sizing: border-box;
+  z-index: -1;
   pointer-events: none;
 }
 
@@ -554,6 +557,7 @@ const SDT_CONTAINER_STYLES = `
   border: 1px solid transparent;
   border-radius: inherit;
   box-sizing: border-box;
+  z-index: 1;
   pointer-events: none;
 }
 
@@ -689,6 +693,11 @@ const SDT_CONTAINER_STYLES = `
   z-index: 10;
 }
 
+.superdoc-structured-content-inline[data-contains-inline-image='true']:not([data-appearance='hidden']) {
+  display: inline-block;
+  vertical-align: top;
+}
+
 /* Hover effect for inline structured content */
 .superdoc-structured-content-inline:not(.ProseMirror-selectednode):hover {
   background-color: var(--sd-content-controls-inline-hover-bg, #f2f2f2);
@@ -820,6 +829,7 @@ const SDT_CONTAINER_STYLES = `
   border: none;
 }
 
+.presentation-editor--viewing .superdoc-structured-content-block::before,
 .presentation-editor--viewing .superdoc-structured-content-block:hover::before,
 .presentation-editor--viewing .superdoc-structured-content-block.sdt-group-hover::before,
 .presentation-editor--viewing .superdoc-structured-content-block[data-lock-mode].sdt-group-hover::before {
@@ -859,6 +869,10 @@ const SDT_CONTAINER_STYLES = `
 
   .superdoc-structured-content-block::after {
     border: none;
+  }
+
+  .superdoc-structured-content-block::before {
+    background: none;
   }
 
   .superdoc-document-section__tooltip,

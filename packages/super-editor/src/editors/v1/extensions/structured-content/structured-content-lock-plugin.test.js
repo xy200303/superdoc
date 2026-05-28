@@ -464,6 +464,44 @@ describe('StructuredContentLockPlugin', () => {
       return result;
     }
 
+    it.each([
+      ['contentLocked', 'Backspace', true],
+      ['contentLocked', 'Delete', true],
+      ['sdtContentLocked', 'Backspace', false],
+      ['sdtContentLocked', 'Delete', false],
+    ])(
+      '%s + %s at the start of the first block SDT paragraph follows wrapper lock rules',
+      (lockMode, key, shouldDeleteWrapper) => {
+        const doc = createDocWithSDT(lockMode, 'structuredContentBlock');
+        const state = applyDocToEditor(doc);
+        const sdtInfo = findSDTNode(state.doc, 'structuredContentBlock');
+        let firstParagraphStart = null;
+
+        state.doc.descendants((node, pos) => {
+          if (node.type.name === 'paragraph' && pos > sdtInfo.pos && pos < sdtInfo.end) {
+            firstParagraphStart = pos + 1;
+            return false;
+          }
+          return true;
+        });
+
+        expect(firstParagraphStart).not.toBeNull();
+        placeCaretAt(state, firstParagraphStart);
+
+        const result = invokeLockHandleKeyDown(key);
+        expect(result.handled).toBe(false);
+        expect(result.prevented).toBe(false);
+
+        if (key === 'Backspace') {
+          handleBackspace(editor);
+        } else {
+          handleDelete(editor);
+        }
+
+        expect(sdtNodeExists(editor.state.doc, 'structuredContentBlock')).toBe(!shouldDeleteWrapper);
+      },
+    );
+
     describe('Path 2 — caret immediately adjacent to inline SDT', () => {
       const adjacencyCases = [
         // [lockMode, key, shouldConsume, description]
