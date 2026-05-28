@@ -54,6 +54,17 @@ const findBlockSdt = (doc) => {
   return result;
 };
 
+const findBlockSdtByText = (doc, text) => {
+  let result = null;
+  doc.descendants((node, pos) => {
+    if (node.type.name !== 'structuredContentBlock' || node.textContent !== text) return true;
+    result = { node, pos, end: pos + node.nodeSize };
+    return false;
+  });
+  expect(result).not.toBeNull();
+  return result;
+};
+
 const makeDoc = (schema, lockMode = 'contentLocked') => {
   const imageRun = schema.nodes.run.create(null, schema.nodes.image.create());
   const sdt = schema.nodes.structuredContentBlock.create({ lockMode }, [
@@ -61,6 +72,16 @@ const makeDoc = (schema, lockMode = 'contentLocked') => {
     schema.nodes.paragraph.create(null, imageRun),
   ]);
   return schema.node('doc', null, [paragraph(schema, 'Before'), sdt, paragraph(schema, 'After')]);
+};
+
+const makeNestedDoc = (schema, lockMode = 'contentLocked') => {
+  const innerSdt = schema.nodes.structuredContentBlock.create({ lockMode }, [paragraph(schema, 'Nested text')]);
+  const outerSdt = schema.nodes.structuredContentBlock.create({ lockMode: 'unlocked' }, [
+    paragraph(schema, 'Outer before'),
+    innerSdt,
+    paragraph(schema, 'Outer after'),
+  ]);
+  return schema.node('doc', null, [paragraph(schema, 'Before'), outerSdt, paragraph(schema, 'After')]);
 };
 
 describe('selectBlockSdtBeforeTextBlockStart', () => {
@@ -99,6 +120,21 @@ describe('selectBlockSdtBeforeTextBlockStart', () => {
     expect(ok).toBe(false);
     expect(dispatch).not.toHaveBeenCalled();
   });
+
+  it('selects nested previous block SDT content from the following nested textblock start', () => {
+    const schema = makeSchema();
+    const doc = makeNestedDoc(schema);
+    const nestedSdt = findBlockSdtByText(doc, 'Nested text');
+    const outerAfterStart = findTextPos(doc, 'Outer after');
+    const state = EditorState.create({ schema, doc, selection: TextSelection.create(doc, outerAfterStart) });
+
+    let dispatched;
+    const ok = selectBlockSdtBeforeTextBlockStart()({ state, dispatch: (tr) => (dispatched = tr) });
+
+    expect(ok).toBe(true);
+    expect(dispatched.selection.from).toBe(findFirstContentCursorPosInNode(nestedSdt.node, nestedSdt.pos));
+    expect(dispatched.selection.to).toBe(findLastContentCursorPosInNode(nestedSdt.node, nestedSdt.pos));
+  });
 });
 
 describe('selectBlockSdtAfterTextBlockEnd', () => {
@@ -121,4 +157,19 @@ describe('selectBlockSdtAfterTextBlockEnd', () => {
       expect(dispatched.selection.to).toBe(findLastContentCursorPosInNode(sdt.node, sdt.pos));
     },
   );
+
+  it('selects nested next block SDT content from the preceding nested textblock end', () => {
+    const schema = makeSchema();
+    const doc = makeNestedDoc(schema);
+    const nestedSdt = findBlockSdtByText(doc, 'Nested text');
+    const outerBeforeEnd = findTextPos(doc, 'Outer before', 'Outer before'.length);
+    const state = EditorState.create({ schema, doc, selection: TextSelection.create(doc, outerBeforeEnd) });
+
+    let dispatched;
+    const ok = selectBlockSdtAfterTextBlockEnd()({ state, dispatch: (tr) => (dispatched = tr) });
+
+    expect(ok).toBe(true);
+    expect(dispatched.selection.from).toBe(findFirstContentCursorPosInNode(nestedSdt.node, nestedSdt.pos));
+    expect(dispatched.selection.to).toBe(findLastContentCursorPosInNode(nestedSdt.node, nestedSdt.pos));
+  });
 });
