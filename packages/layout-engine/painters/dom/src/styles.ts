@@ -740,8 +740,8 @@ const SDT_CONTAINER_STYLES = `
 .superdoc-structured-content-inline__label {
   position: absolute;
   bottom: calc(100% + 1px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: 2px;
+  transform: none;
   border-radius: 4px 4px 0 0;
   white-space: nowrap;
   z-index: 100;

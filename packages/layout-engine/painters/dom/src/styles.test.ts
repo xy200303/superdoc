@@ -120,6 +120,10 @@ describe('ensureSdtContainerStyles', () => {
     expect(sharedLabelDragHandleRule).toContain('center 3px / 2px 2px no-repeat,');
     expect(sharedLabelDragHandleRule).toContain('center 6px / 2px 2px no-repeat;');
     expect(inlineSelectedRule).toContain('display: inline-flex;');
+    expect(inlineLabelRule).toContain('left: 2px;');
+    expect(inlineLabelRule).toContain('transform: none;');
+    expect(inlineLabelRule).not.toContain('left: 50%;');
+    expect(inlineLabelRule).not.toContain('translateX(-50%)');
     expect(inlineLabelRule).toContain('border-radius: 4px 4px 0 0;');
     expect(blockLabelRule).toContain('white-space: nowrap;');
     expect(blockLabelRule).toContain('top: -18px;');
