@@ -1169,15 +1169,18 @@ export function createSuperDocUI(options: SuperDocUIOptions): SuperDocUI {
     PRESENTATION_EVENTS.forEach((name) => {
       next.on?.(name, onPresentationChange);
     });
-    // Geometry-only: layout/pagination repaints move painted rects without a
-    // body `transaction`. Drive the viewport geometry signal, NOT the slice
+    // Geometry-only: layout repaints move painted rects without a body
+    // `transaction`. Drive the viewport geometry signal, NOT the slice
     // recompute (which would re-attach editor listeners on every repaint).
+    // Listen to `layoutUpdated` only: `paginationUpdate` is emitted
+    // back-to-back with the same payload for the same paint
+    // (PresentationEditor.ts:6491-6492), so subscribing to both would
+    // double-count one repaint — a zoom would coalesce to 'mixed' instead of
+    // 'zoom'. `layoutUpdated` alone covers every repaint.
     next.on?.('layoutUpdated', onGeometryLayout);
-    next.on?.('paginationUpdate', onGeometryLayout);
     currentPresentationTeardown = () => {
       PRESENTATION_EVENTS.forEach((name) => next.off?.(name, onPresentationChange));
       next.off?.('layoutUpdated', onGeometryLayout);
-      next.off?.('paginationUpdate', onGeometryLayout);
     };
   };
 
