@@ -3502,6 +3502,26 @@ export class PresentationEditor extends EventEmitter {
   }
 
   /**
+   * Whether an element is fully within the vertical bounds of the active scroll container.
+   * Used by scrollToPosition's `ifNeeded` mode (SD-3315) to avoid moving the viewport for a
+   * target that is already visible. Measures with getBoundingClientRect because inline match
+   * spans report clientHeight 0. Vertical-only: search navigation is a block-axis concern.
+   */
+  #isElementFullyVisibleInScrollContainer(el: Element): boolean {
+    const rect = el.getBoundingClientRect();
+    const viewport =
+      this.#scrollContainer instanceof Window
+        ? { top: 0, bottom: this.#scrollContainer.innerHeight }
+        : this.#scrollContainer instanceof Element
+          ? this.#scrollContainer.getBoundingClientRect()
+          : this.#visibleHost?.ownerDocument?.defaultView
+            ? { top: 0, bottom: this.#visibleHost.ownerDocument.defaultView.innerHeight }
+            : null;
+    if (!viewport) return false;
+    return rect.top >= viewport.top && rect.bottom <= viewport.bottom;
+  }
+
+  /**
    * Scroll the visible host so a given document position is brought into view.
    *
    * This is primarily used by commands like search navigation when running in
@@ -3512,11 +3532,13 @@ export class PresentationEditor extends EventEmitter {
    * @param options - Scrolling options
    * @param options.block - Alignment within the viewport ('start' | 'center' | 'end' | 'nearest')
    * @param options.behavior - Scroll behavior ('auto' | 'smooth')
+   * @param options.ifNeeded - When true, skip movement if the target is already fully visible
+   *   (downgrades to 'nearest'); off-screen targets still use `block`. Used by search navigation.
    * @returns True if the position could be mapped and scrolling was applied
    */
   scrollToPosition(
     pos: number,
-    options: { block?: 'start' | 'center' | 'end' | 'nearest'; behavior?: ScrollBehavior } = {},
+    options: { block?: 'start' | 'center' | 'end' | 'nearest'; behavior?: ScrollBehavior; ifNeeded?: boolean } = {},
   ): boolean {
     // Cancel any pending focus-scroll RAF so this intentional scroll is not undone
     // by the wrapOffscreenEditorFocus safety net (e.g. search navigation after focus).
@@ -3534,7 +3556,9 @@ export class PresentationEditor extends EventEmitter {
     const clampedPos = Math.max(0, Math.min(pos, doc.content.size));
 
     const behavior = options.behavior ?? 'auto';
-    const block = options.block ?? 'center';
+    // SD-3315: the caller's requested landing. In ifNeeded mode an already-visible match
+    // downgrades this to 'nearest' (computed per-target below) so it does not re-center.
+    const requestedBlock = options.block ?? 'center';
 
     // Use a DOM marker + scrollIntoView so the browser finds the correct scroll container
     // (window, parent overflow container, etc.) without us guessing.
@@ -3561,6 +3585,21 @@ export class PresentationEditor extends EventEmitter {
           // Find the specific element containing this position for precise centering
           const targetEl = this.#findElementAtPosition(pageEl, clampedPos);
           const elToScroll = targetEl ?? pageEl;
+
+          // SD-3315: "scroll only if needed" mode for search navigation. When the caller
+          // opts in and we resolved the precise target element (the match span, not the
+          // page-div fallback), and that element is already fully inside the scroll
+          // container, downgrade the scroll to 'nearest' — a no-op for a fully-visible
+          // element — so next/previous does not re-center an already-visible match (the
+          // ~50px jump). We deliberately do NOT early-return: the scrollIntoView + RAF
+          // re-assert below also override the hidden editor's selection-sync scroll
+          // (dispatched .scrollIntoView()), which otherwise jumps the viewport to the
+          // hidden editor's geometry. A null targetEl (page fallback) or an off-screen /
+          // partially-clipped match keeps the requested block (center).
+          const block =
+            options.ifNeeded && targetEl && this.#isElementFullyVisibleInScrollContainer(targetEl)
+              ? 'nearest'
+              : requestedBlock;
           elToScroll.scrollIntoView({ block, inline: 'nearest', behavior });
           // AIDEV-NOTE: SD-3045. Search nav (and any other caller of
           // scrollToPosition) places the viewport intentionally — usually
@@ -3764,11 +3803,13 @@ export class PresentationEditor extends EventEmitter {
    * @param options - Scrolling options
    * @param options.block - Alignment within the viewport ('start' | 'center' | 'end' | 'nearest')
    * @param options.behavior - Scroll behavior ('auto' | 'smooth')
+   * @param options.ifNeeded - When true, skip movement if the target is already fully visible
+   *   (downgrades to 'nearest'); off-screen targets still use `block`. Used by search navigation.
    * @returns Promise resolving to true if scrolling succeeded, false otherwise
    */
   async scrollToPositionAsync(
     pos: number,
-    options: { block?: 'start' | 'center' | 'end' | 'nearest'; behavior?: ScrollBehavior } = {},
+    options: { block?: 'start' | 'center' | 'end' | 'nearest'; behavior?: ScrollBehavior; ifNeeded?: boolean } = {},
   ): Promise<boolean> {
     // Fast path: try sync scroll first (works if page already mounted)
     if (this.scrollToPosition(pos, options)) {

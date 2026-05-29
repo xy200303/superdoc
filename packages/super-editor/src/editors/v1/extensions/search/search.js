@@ -577,13 +577,19 @@ export const Search = Extension.create({
           if (dispatch) dispatch(tr);
 
           const presentationEditor = editor.presentationEditor;
+          // SD-3315: per-match navigation uses "scroll only if needed" — an already-visible
+          // match must not be re-centered (the ~50px jump). When the match is off-screen or
+          // partially clipped, scrollToPosition falls back to its normal block:'center'
+          // landing. goToFirstMatch keeps plain centering for the initial jump.
           // Try sync scroll first — returns true when the page is mounted and in body mode.
-          const scrolled = presentationEditor?.scrollToPosition?.(from, { block: 'center' }) ?? false;
+          const scrolled = presentationEditor?.scrollToPosition?.(from, { block: 'center', ifNeeded: true }) ?? false;
 
           if (!scrolled) {
             // Async version handles virtualized (un-mounted) pages; fire-and-forget
             // because it will scroll once the target page mounts.
-            Promise.resolve(presentationEditor?.scrollToPositionAsync?.(from, { block: 'center' })).catch(() => {});
+            Promise.resolve(
+              presentationEditor?.scrollToPositionAsync?.(from, { block: 'center', ifNeeded: true }),
+            ).catch(() => {});
 
             // DOM fallback for non-presentation contexts or when presentation
             // scroll cannot run (e.g. header/footer mode, no layout).
