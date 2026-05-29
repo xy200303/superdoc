@@ -1,0 +1,57 @@
+---
+title: 'Content controls'
+description: 'Build your own UI for Word content controls (SDT fields): turn off the built-in chrome, react to the active control, and anchor your UI with getRect().'
+---
+
+Turn off SuperDoc's built-in chrome, listen for the active control, and anchor your own UI over it. The control wrappers and `data-sdt-*` attributes stay in the DOM, so your UI has something to attach to.
+
+## A minimal field chip
+
+```ts
+import { SuperDoc } from 'superdoc';
+import { createSuperDocUI } from 'superdoc/ui';
+
+new SuperDoc({
+  selector: '#editor',
+  document: '/contract.docx',
+  // Turn off the built-in labels, borders, and hover/selection chrome.
+  modules: { contentControls: { chrome: 'none' } },
+  onReady: ({ superdoc }) => {
+    const ui = createSuperDocUI({ superdoc });
+
+    superdoc.on('content-control:active-change', ({ active }) => {
+      if (!active) return chip.hide(); // `chip` is your own element
+      const rect = ui.contentControls.getRect({ id: active.id });
+      if (rect.success) chip.showAt(rect.rect, active.alias ?? active.tag);
+    });
+  },
+});
+```
+
+The event tells you *what* is active; `getRect` tells you *where* to draw. `active` is an `SdtRef` with `id`, `tag`, `alias`, `controlType`, and `scope`.
+
+## Pick the right surface
+
+| Goal | API |
+| --- | --- |
+| Active control (enter, switch, leave) | `superdoc.on('content-control:active-change')` |
+| Click inside a control | `superdoc.on('content-control:click')` |
+| Full live list and active stack | `ui.contentControls.observe()` / `getSnapshot()` |
+| Read one control | `ui.contentControls.get({ id })` |
+| Position your UI | `ui.contentControls.getRect({ id })` |
+| Hover and right-click hit-testing | `ui.viewport.entityAt()` / `contextAt()` |
+| Change content, tags, or locks | `editor.doc.contentControls.*` |
+
+`active` is the innermost control. For nested controls (an inline field inside a block clause), `activePath` carries the full stack, innermost first, so you don't also need `observe()` just to read the nesting.
+
+## Current limits
+
+- No built-in scroll-to-control. Read the position with `getRect()` and scroll your container.
+- No geometry-change subscription. Re-read `getRect()` on scroll, resize, and the `pagination-update` / `zoomChange` events.
+- No focus-by-id helper. Clicking a control in the document still drives selection.
+
+## See also
+
+- [Contract templates demo](https://github.com/superdoc-dev/superdoc/tree/main/demos/contract-templates) - a working field chip built on these APIs.
+- [Configuration](/editor/superdoc/configuration) - the `modules.contentControls.chrome` option.
+- [Document API: content controls](/document-api/features/content-controls) - read and change controls.

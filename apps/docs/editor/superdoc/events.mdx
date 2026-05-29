@@ -269,10 +269,7 @@ type SdtRef = {
 };
 ```
 
-`active` is the deepest control (`activePath[0]`). For **nested** controls (an
-inline field inside a block clause), `activePath` carries the whole stack
-innermost-first, so you can update nested custom UI without also reading
-`ui.contentControls.observe()`. `activePath` is empty on blur.
+`active` is the deepest control (`activePath[0]`); `activePath` holds the full stack, innermost first. Controls without an `id` do not emit these events.
 
 How to interpret:
 
@@ -291,30 +288,9 @@ superdoc.on('content-control:click', ({ target, source }) => {
 });
 ```
 
-Both are also available as config callbacks: `onContentControlActiveChange`
-and `onContentControlClick`.
+Both are also available as config callbacks: `onContentControlActiveChange` and `onContentControlClick`.
 
-### Building custom content-control UI
-
-Use these events (or `ui.contentControls.observe()`) to know **what** is
-active, and `ui.contentControls.getRect({ id })` to know **where** to draw your
-own UI. A typical custom field affordance subscribes to
-`content-control:active-change` for the active control, then calls `getRect`
-to anchor an element over it. Disable the built-in chrome with
-`modules.contentControls.chrome: 'none'` when you want your UI to fully replace
-it. See the `contract-templates` demo for a working example.
-
-### Requirements and limitations
-
-- **An `id` is required.** Payloads key off the control's `id`. Controls
-  imported from a `.docx` that has no `w:id` resolve to a null id and do **not**
-  emit these events. Controls created through SuperDoc (commands / document API)
-  get an id automatically, and Word-authored controls normally carry `w:id`.
-- **`active` is the primary (deepest) control.** When controls are nested (for
-  example an inline field inside a block clause), `active` is the innermost
-  control and `activePath` carries the full stack. Use
-  `ui.contentControls.observe()` when you need ongoing list/value reactivity,
-  not just the active nesting for a single event.
+To build your own content-control UI on these events, see [Custom UI > Content controls](/editor/custom-ui/content-controls).
 
 ## Comments events
 
