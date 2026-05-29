@@ -3911,33 +3911,46 @@ export class PresentationEditor extends EventEmitter {
     entityId: string,
     options: { block?: 'start' | 'center' | 'end' | 'nearest'; behavior?: ScrollBehavior } = {},
   ): Promise<boolean> {
+    const pos = this.#resolveContentControlCaretPos(entityId);
+    if (pos == null) return false;
+    return this.scrollToPositionAsync(pos, {
+      behavior: options.behavior ?? 'smooth',
+      block: options.block ?? 'center',
+    });
+  }
+
+  /**
+   * Resolve a caret position inside the content control with `entityId`, or
+   * `null` when no such control exists in the body document.
+   *
+   * Prefers the first *text* position inside the control: only text positions
+   * reliably map to a layout fragment; wrapper boundaries (block, paragraph,
+   * run) sit between fragments. A deep `descendants` walk handles inline
+   * (`run > text`) and block (`paragraph > run > text`) nesting uniformly
+   * (`descendants` yields each child's position relative to the node's
+   * content, so the absolute position is `found.pos + 1 + rel`). An empty
+   * control with no text falls back to the first inside position.
+   *
+   * The id is normalized to a string before comparing: the id a consumer
+   * passes comes from the list / painted `data-sdt-id` (always a string), but
+   * the PM attr can be numeric, so a strict `===` would miss it.
+   */
+  #resolveContentControlCaretPos(entityId: string): number | null {
     const editor = this.#editor;
-    if (!editor || typeof entityId !== 'string' || entityId.length === 0) return false;
+    if (!editor || typeof entityId !== 'string' || entityId.length === 0) return null;
 
     let found: { pos: number; node: ReturnType<typeof editor.state.doc.nodeAt> } | null = null;
     editor.state.doc.descendants((node, pos) => {
       if (found) return false;
       const name = node.type?.name;
-      // Normalize the node id to a string before comparing. The id a
-      // consumer passes comes from the list / painted `data-sdt-id` (always
-      // a string), but the PM attr can be numeric, so a strict `===` would
-      // miss it. Matches the painted-DOM (`getRect`) id convention.
       if ((name === 'structuredContent' || name === 'structuredContentBlock') && String(node.attrs?.id) === entityId) {
         found = { pos, node };
         return false;
       }
       return true;
     });
-    if (!found) return false;
+    if (!found) return null;
 
-    // Resolve the first *text* position inside the control. Only text
-    // positions reliably map to a layout fragment; wrapper boundaries
-    // (block, paragraph, run) sit between fragments and make
-    // `scrollToPositionAsync` fail. A deep `descendants` walk handles
-    // inline (`run > text`) and block (`paragraph > run > text`) nesting
-    // uniformly. `descendants` yields each child's position relative to
-    // the node's content, so the absolute position is `found.pos + 1 + rel`.
-    // Scroll-only: this does NOT move the selection or focus.
     let contentPos = found.pos + 1;
     let textFound = false;
     found.node?.descendants((child, rel) => {
@@ -3949,11 +3962,65 @@ export class PresentationEditor extends EventEmitter {
       }
       return true;
     });
+    return contentPos;
+  }
 
-    return this.scrollToPositionAsync(contentPos, {
+  /**
+   * Focus a content control (SDT field/clause) by its id: place the caret
+   * inside it and scroll it into view — the "take me there and let me edit"
+   * counterpart to the scroll-only {@link scrollContentControlIntoView}.
+   *
+   * Selection, not mutation: locks (`sdtLocked` / `contentLocked` / …) and
+   * `viewing` mode do NOT block placing the caret — they still block the edits
+   * the user then attempts, via the normal editing rules. So a custom UI can
+   * focus a locked clause to let the user inspect it.
+   *
+   * Caret-inside (not a wrapper NodeSelection): both SDT node types are
+   * `atom: false`, so a `TextSelection` inside is the meaningful selection.
+   *
+   * v1 is body-only: searches the body editor, so a control in a
+   * header/footer/note story resolves to `not-found`.
+   *
+   * @returns `{ success: true }` once focused, or `{ success: false, reason }`
+   *   for a real navigation problem: `not-ready` (no editor), `invalid-id`
+   *   (empty id), `not-found` (unknown id / non-body), `not-reachable`
+   *   (found but the page could not be scrolled into view).
+   */
+  async focusContentControl(
+    entityId: string,
+    options: { block?: 'start' | 'center' | 'end' | 'nearest'; behavior?: ScrollBehavior } = {},
+  ): Promise<{ success: true } | { success: false; reason: 'not-ready' | 'invalid-id' | 'not-found' | 'not-reachable' }> {
+    const editor = this.#editor;
+    if (!editor) return { success: false, reason: 'not-ready' };
+    if (typeof entityId !== 'string' || entityId.length === 0) return { success: false, reason: 'invalid-id' };
+
+    const pos = this.#resolveContentControlCaretPos(entityId);
+    if (pos == null) return { success: false, reason: 'not-found' };
+
+    // Without setTextSelection the editor can't place the caret, so focus
+    // can't honor its "caret placed" contract — fail before scrolling.
+    if (typeof editor.commands?.setTextSelection !== 'function') {
+      return { success: false, reason: 'not-ready' };
+    }
+
+    // Scroll first and honor the result. A focus that can't bring the control
+    // into view must not report success (it would leave a caret on a page that
+    // never mounted) — matches #scrollToBlockCandidate. Model-aware: mounts a
+    // virtualized page first.
+    const scrolled = await this.scrollToPositionAsync(pos, {
       behavior: options.behavior ?? 'smooth',
       block: options.block ?? 'center',
     });
+    if (!scrolled) return { success: false, reason: 'not-reachable' };
+
+    // Place the caret inside the control and honor the result — report success
+    // only if the selection was actually placed. setTextSelection clamps and
+    // focuses the (hidden) editor view with preventScroll, so keyboard input
+    // goes to the control without re-jumping the viewport.
+    if (!editor.commands.setTextSelection({ from: pos, to: pos })) {
+      return { success: false, reason: 'not-reachable' };
+    }
+    return { success: true };
   }
 
   /**

@@ -67,6 +67,7 @@ import type {
   ViewportPositionHit,
   ViewportHandle,
   ViewportGeometryEvent,
+  ContentControlFocusResult,
   ViewportRect,
   ViewportRectResult,
 } from './types.js';
@@ -2391,6 +2392,33 @@ export function createSuperDocUI(options: SuperDocUIOptions): SuperDocUI {
         behavior: behavior ?? 'smooth',
       });
       return { success: Boolean(ok) };
+    },
+    async focus({
+      id,
+      block,
+      behavior,
+    }: {
+      id: string;
+      block?: 'start' | 'center' | 'end' | 'nearest';
+      behavior?: 'auto' | 'smooth';
+    }): Promise<ContentControlFocusResult> {
+      if (typeof id !== 'string' || id.length === 0) return { success: false, reason: 'invalid-id' };
+      // Same host-editor resolution as scrollIntoView. focus places the caret
+      // (selection) and scrolls; locks / viewing mode don't block it.
+      const editor = resolveHostEditor(superdoc);
+      const presentation = editor?.presentationEditor as
+        | {
+            focusContentControl?: (
+              id: string,
+              opts: { block?: 'start' | 'center' | 'end' | 'nearest'; behavior?: 'auto' | 'smooth' },
+            ) => Promise<ContentControlFocusResult>;
+          }
+        | null
+        | undefined;
+      if (!presentation || typeof presentation.focusContentControl !== 'function') {
+        return { success: false, reason: 'not-ready' };
+      }
+      return presentation.focusContentControl(id, { block: block ?? 'center', behavior: behavior ?? 'smooth' });
     },
   };
 
