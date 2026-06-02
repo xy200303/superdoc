@@ -29,6 +29,8 @@ import type {
   Comment,
   FontConfig,
   FontsResolvedPayload,
+  FontsChangedPayload,
+  FontResolutionRecord,
   ListDefinitionsPayload,
   ProofingProvider,
   User,
@@ -66,6 +68,32 @@ export type NavigableAddress = SuperEditorNavigableAddress;
  * `#assignUserColor()` after `#init`.
  */
 export type { User } from '@superdoc/super-editor';
+export type { FontResolutionRecord, FontsChangedPayload } from '@superdoc/super-editor';
+
+/**
+ * Read-only font surface on a SuperDoc instance (`superdoc.fonts`). The authoritative,
+ * substitution- and load-aware answer to "what fonts does this document use and did
+ * SuperDoc render them faithfully", pulled on demand. The same report streams via the
+ * `fonts-changed` event / `onFontsChanged`. All three reflect the active editor; they
+ * return empty arrays when no editor is active. The write surface (add/map/preload) is
+ * deferred. {@link getReport} and {@link getDocumentFonts} cover the document's DECLARED
+ * fonts (font table + theme + defaults), not only fonts visible on screen.
+ */
+export interface SuperDocFontsApi {
+  /** Per-font report: requested logical family -> physical render family, reason, load status, export family, missing. */
+  getReport(): FontResolutionRecord[];
+  /** Declared families with no faithful render font loaded (the substitution-aware truth). */
+  getMissingFonts(): string[];
+  /** The document's declared logical font families, deduped. */
+  getDocumentFonts(): string[];
+  /**
+   * Observe the font report: invokes `callback` immediately with the current report (if one
+   * has resolved) and then on every change. Use this rather than `on('fonts-changed')` when
+   * you may subscribe after the report resolved or after a document swap - it delivers the
+   * current state regardless of timing. Returns an unsubscribe function.
+   */
+  onReport(callback: (payload: FontsChangedPayload) => void): () => void;
+}
 
 /**
  * Internal post-`#init` shape of the active user. Extends the public
@@ -1835,8 +1863,20 @@ export interface Config {
    * Callback fired after the editor reports `fonts-resolved`. The payload
    * contains `documentFonts` and `unsupportedFonts` arrays so hosts can fall
    * back, warn, or block printing on unsupported faces.
+   *
+   * LEGACY/EARLY: this fires once before fonts load and is not substitution-aware
+   * (`unsupportedFonts` over-reports families that render via a bundled substitute).
+   * For the authoritative, load-settled picture use {@link onFontsChanged}.
    */
   onFontsResolved?: (payload: FontsResolvedPayload) => void;
+  /**
+   * Callback fired with the authoritative substitution + load-aware font report: once
+   * after the load-before-measure gate settles (`source: 'initial'`), again when a face
+   * arrives after a timed-out first paint (`'late-load'`). Each payload carries the full
+   * per-font `resolutions`, the genuinely `missingFonts`, and a `loadSummary`. Also
+   * available to pull on demand via `superdoc.fonts.getReport()`.
+   */
+  onFontsChanged?: (payload: FontsChangedPayload) => void;
 }
 
 /**

@@ -10,6 +10,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { visualizer } from 'rollup-plugin-visualizer';
 import vue from '@vitejs/plugin-vue'
 import layeredCssPlugin from './vite-plugin-layered-css.mjs';
+import bundledFontsPlugin from './vite-plugin-bundled-fonts.mjs';
 
 import { version } from './package.json';
 import sourceResolve from '../../vite.sourceResolve';
@@ -120,6 +121,7 @@ export default defineConfig(({ mode, command }) => {
   const plugins = [
     vue(),
     layeredCssPlugin(),
+    bundledFontsPlugin(),
     !skipDts && dts({
       // Foundational sources (superdoc, super-editor, document-api) are
       // always included; relocation patterns come from the canonical

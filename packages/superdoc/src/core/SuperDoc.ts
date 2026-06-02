@@ -87,12 +87,20 @@ import type {
   SuperDocLockedPayload,
   SuperDocReadyPayload,
   SuperDocState,
+  SuperDocFontsApi,
   SurfaceHandle,
   SurfaceRequest,
   UpgradeToCollaborationOptions,
   User,
 } from './types/index.js';
-import type { Comment, FontsResolvedPayload, ListDefinitionsPayload, PresentationEditor } from '@superdoc/super-editor';
+import type {
+  Comment,
+  FontsResolvedPayload,
+  FontsChangedPayload,
+  FontResolutionRecord,
+  ListDefinitionsPayload,
+  PresentationEditor,
+} from '@superdoc/super-editor';
 import type * as Y from 'yjs';
 // `Whiteboard` is already imported as a value above (line 19); reuse it
 // as a type here without a separate `import type` declaration.
@@ -141,6 +149,7 @@ interface SuperDocEventMap {
   'editor-update': [EditorUpdateEvent];
   'content-error': [SuperDocContentErrorPayload];
   'fonts-resolved': [FontsResolvedPayload];
+  'fonts-changed': [FontsChangedPayload];
   'pagination-update': [SuperDocPaginationPayload];
   'list-definitions-change': [ListDefinitionsPayload];
   'comments-update': [SuperDocCommentsUpdatePayload];
@@ -860,6 +869,7 @@ export class SuperDoc extends EventEmitter<SuperDocEventMap> {
     this.#onConfig('list-definitions-change', this.config.onListDefinitionsChange);
     this.#onConfig('pagination-update', this.config.onPaginationUpdate);
     this.#onConfig('fonts-resolved', this.config.onFontsResolved);
+    this.#onConfig('fonts-changed', this.config.onFontsChanged);
   }
 
   /**
@@ -1488,7 +1498,39 @@ export class SuperDoc extends EventEmitter<SuperDocEventMap> {
   broadcastEditorCreate(editor: Editor) {
     this.readyEditors++;
     this.broadcastReady();
+    this.#wireFontsChangedRelay(editor);
     this.emit('editorCreate', { editor: createDeprecatedEditorProxy(editor) });
+  }
+
+  /** Editors whose `fonts-changed` we already relay, so a repeated create wires once. */
+  #fontsRelayEditors = new WeakSet<Editor>();
+
+  /**
+   * Relay an editor's authoritative `fonts-changed` up to the SuperDoc surface, so
+   * `superdoc.on('fonts-changed')` / `onFontsChanged` fire without the legacy
+   * `fonts-resolved` SuperDoc.vue listener-transport. Two robustness rules the happy
+   * path missed: (1) guard `editor.on` - test stubs and pre-layout editors lack it;
+   * (2) the PresentationEditor may have emitted its first report BEFORE this relay
+   * subscribed (a fast or swapped document), so replay the cached payload once on wire,
+   * matching what `superdoc.fonts.getReport()` returns for the active document. Wired at
+   * most once per editor (a create can fire twice).
+   */
+  #wireFontsChangedRelay(editor: Editor): void {
+    if (!editor || typeof editor.on !== 'function') return;
+    if (this.#fontsRelayEditors.has(editor)) return;
+    this.#fontsRelayEditors.add(editor);
+    editor.on('fonts-changed', (payload) => this.#deliverFontsChanged(payload));
+    const cached = editor.presentationEditor?.getLastFontsChangedPayload?.();
+    if (cached) this.#deliverFontsChanged(cached);
+  }
+
+  /** Last font report delivered on this instance, so `fonts.onReport` can replay it. */
+  #lastFontsChangedPayload: FontsChangedPayload | null = null;
+
+  /** Cache then emit a font report, so a later `onReport` subscriber gets the current one. */
+  #deliverFontsChanged(payload: FontsChangedPayload): void {
+    this.#lastFontsChangedPayload = payload;
+    this.emit('fonts-changed', payload);
   }
 
   /**
@@ -1508,6 +1550,44 @@ export class SuperDoc extends EventEmitter<SuperDocEventMap> {
   /** @param args */
   #log(...args: unknown[]) {
     (console.debug ? console.debug : console.log)('🦋 🦸‍♀️ [superdoc]', ...args);
+  }
+
+  #fontsApi: SuperDocFontsApi | null = null;
+
+  /**
+   * Read-only font surface: the substitution- and load-aware report for the active
+   * editor's document. Pulls on demand (the same report streams via `fonts-changed`).
+   * Stable identity; the closures always read the current `activeEditor`. Returns empty
+   * arrays when no editor is active or layout mode is off.
+   */
+  get fonts(): SuperDocFontsApi {
+    if (!this.#fontsApi) {
+      this.#fontsApi = {
+        getReport: () => this.activeEditor?.presentationEditor?.getFontReport() ?? [],
+        getMissingFonts: () => this.activeEditor?.presentationEditor?.getMissingFonts() ?? [],
+        getDocumentFonts: () =>
+          (this.activeEditor?.presentationEditor?.getFontReport() ?? []).map((record) => record.logicalFamily),
+        onReport: (callback) => {
+          // Snapshot-then-subscribe: the report may already have resolved (it fires during
+          // load, before a consumer subscribes - and a document swap creates a fresh editor),
+          // so deliver the current one immediately, then stream future changes. The active
+          // editor is the source of truth for "current": use ITS cached report so a snapshot
+          // matches `getReport()` for the active document. The instance-level cache can hold a
+          // PRIOR document's payload after an active-editor switch, so it is only a fallback
+          // for when no editor is active. When an active editor exists but has not produced a
+          // report yet, deliver nothing (the subscription catches its first one) rather than
+          // replaying a stale prior-editor payload. Returns an unsubscribe.
+          const activeEditor = this.activeEditor;
+          const current = activeEditor
+            ? (activeEditor.presentationEditor?.getLastFontsChangedPayload?.() ?? null)
+            : (this.#lastFontsChangedPayload ?? null);
+          if (current) callback(current);
+          this.on('fonts-changed', callback);
+          return () => this.off('fonts-changed', callback);
+        },
+      };
+    }
+    return this.#fontsApi;
   }
 
   /**

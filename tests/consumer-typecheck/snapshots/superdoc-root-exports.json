@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-31T20:12:13.686Z",
+  "generatedAt": "2026-06-02T19:41:10.924Z",
   "ticket": "SD-3212 PR A0",
   "package": "superdoc",
   "rootExport": {
@@ -89,6 +89,8 @@
         "FlowBlock",
         "FlowMode",
         "FontConfig",
+        "FontResolutionRecord",
+        "FontsChangedPayload",
         "FontsResolvedPayload",
         "HTML",
         "ImageDeselectedEvent",
@@ -176,6 +178,7 @@
         "SuperDocExceptionPayload",
         "SuperDocExceptionRestorePayload",
         "SuperDocExceptionStorePayload",
+        "SuperDocFontsApi",
         "SuperDocLayoutEngineOptions",
         "SuperDocLockedPayload",
         "SuperDocReadyPayload",
@@ -314,6 +317,8 @@
         "FlowBlock",
         "FlowMode",
         "FontConfig",
+        "FontResolutionRecord",
+        "FontsChangedPayload",
         "FontsResolvedPayload",
         "HTML",
         "ImageDeselectedEvent",
@@ -401,6 +406,7 @@
         "SuperDocExceptionPayload",
         "SuperDocExceptionRestorePayload",
         "SuperDocExceptionStorePayload",
+        "SuperDocFontsApi",
         "SuperDocLayoutEngineOptions",
         "SuperDocLockedPayload",
         "SuperDocReadyPayload",
@@ -557,11 +563,11 @@
     }
   },
   "counts": {
-    "types.import": 219,
-    "types.require": 219,
+    "types.import": 222,
+    "types.require": 222,
     "import": 41,
     "require": 41,
-    "union": 219
+    "union": 222
   },
   "divergences": {
     "typesImportVsRequire": {
@@ -640,6 +646,8 @@
         "FlowBlock",
         "FlowMode",
         "FontConfig",
+        "FontResolutionRecord",
+        "FontsChangedPayload",
         "FontsResolvedPayload",
         "ImageDeselectedEvent",
         "ImageSelectedEvent",
@@ -720,6 +728,7 @@
         "SuperDocExceptionPayload",
         "SuperDocExceptionRestorePayload",
         "SuperDocExceptionStorePayload",
+        "SuperDocFontsApi",
         "SuperDocLayoutEngineOptions",
         "SuperDocLockedPayload",
         "SuperDocReadyPayload",

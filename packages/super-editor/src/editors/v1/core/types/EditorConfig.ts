@@ -7,6 +7,7 @@ import type { Mark as EditorMark } from '../Mark.js';
 import type { EditorRenderer } from '../renderers/EditorRenderer.js';
 import type {
   FontsResolvedPayload,
+  FontsChangedPayload,
   Comment,
   CommentsPayload,
   CommentLocationsPayload,
@@ -590,6 +591,9 @@ export interface EditorOptions {
 
   /** Called when all fonts used in the document are determined */
   onFontsResolved?: ((payload: FontsResolvedPayload) => void) | null;
+
+  /** Called with the authoritative substitution + load-aware font report once it settles and on change. */
+  onFontsChanged?: ((payload: FontsChangedPayload) => void) | null;
 
   /** Handler for image uploads - async (file) => url */
   handleImageUpload?: ((file: File) => Promise<string>) | null;

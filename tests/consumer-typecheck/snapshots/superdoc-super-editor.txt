@@ -55,6 +55,11 @@ FieldValue
 FlowBlock
 FlowMode
 FontConfig
+FontLoadStatus
+FontLoadSummary
+FontResolutionReason
+FontResolutionRecord
+FontsChangedPayload
 FontsResolvedPayload
 HeadlessToolbarController
 HeadlessToolbarSuperdocHost

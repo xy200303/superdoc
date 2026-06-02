@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import { version } from './package.json';
 import { getAliases } from './vite.config.js';
 import layeredCssPlugin from './vite-plugin-layered-css.mjs';
+import bundledFontsPlugin from './vite-plugin-bundled-fonts.mjs';
 
 // Standalone browser bundle for CDN / <script> tag consumption.
 // Exposes `window.SuperDoc`. Inlines all runtime deps (Vue, ProseMirror,
@@ -10,7 +11,7 @@ import layeredCssPlugin from './vite-plugin-layered-css.mjs';
 // ESM-only and can't be loaded as globals. Only pdfjs-dist stays external
 // because of its size; PDF viewing requires the ESM + import-map path.
 export default defineConfig(({ command }) => {
-  const plugins = [vue(), layeredCssPlugin()];
+  const plugins = [vue(), layeredCssPlugin(), bundledFontsPlugin()];
   const isDev = command === 'serve';
 
   return {

@@ -1,17 +1,17 @@
 # superdoc root export inventory (SD-3212 PR A0)
 
-Generated: 2026-05-31T20:12:13.686Z
+Generated: 2026-06-02T19:41:10.924Z
 Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 
 ## Counts
 
 | Source | Path | Count |
 |---|---|---|
-| types.import | `./dist/superdoc/src/public/index.d.ts` | 219 |
-| types.require | `./dist/superdoc/src/public/index.d.cts` | 219 |
+| types.import | `./dist/superdoc/src/public/index.d.ts` | 222 |
+| types.require | `./dist/superdoc/src/public/index.d.cts` | 222 |
 | import | `./dist/superdoc.es.js` | 41 |
 | require | `./dist/superdoc.cjs` | 41 |
-| **union** |  | **219** |
+| **union** |  | **222** |
 
 ## Divergences
 
@@ -19,7 +19,7 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 - types.require only (not in types.import): 0
 - ESM only (not in CJS): 0
 - CJS only (not in ESM): 0
-- typed but no runtime export (phantom risk): 178
+- typed but no runtime export (phantom risk): 181
 - runtime export but not typed (silent shadow on root): 0
 
 ### Type-only names (no runtime)
@@ -90,6 +90,8 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 - `FlowBlock`
 - `FlowMode`
 - `FontConfig`
+- `FontResolutionRecord`
+- `FontsChangedPayload`
 - `FontsResolvedPayload`
 - `ImageDeselectedEvent`
 - `ImageSelectedEvent`
@@ -170,6 +172,7 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 - `SuperDocExceptionPayload`
 - `SuperDocExceptionRestorePayload`
 - `SuperDocExceptionStorePayload`
+- `SuperDocFontsApi`
 - `SuperDocLayoutEngineOptions`
 - `SuperDocLockedPayload`
 - `SuperDocReadyPayload`
@@ -282,6 +285,8 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 | `FlowBlock` | ✓ | ✓ |   |   | 3 | ✓ | 0 | 0 | 0 | ✓ |
 | `FlowMode` | ✓ | ✓ |   |   | 3 | ✓ | 0 | 0 | 0 |   |
 | `FontConfig` | ✓ | ✓ |   |   | 2 | ✓ | 0 | 0 | 0 |   |
+| `FontResolutionRecord` | ✓ | ✓ |   |   | 1 |   | 0 | 0 | 0 |   |
+| `FontsChangedPayload` | ✓ | ✓ |   |   | 1 |   | 0 | 0 | 0 |   |
 | `FontsResolvedPayload` | ✓ | ✓ |   |   | 2 | ✓ | 0 | 0 | 0 |   |
 | `HTML` | ✓ | ✓ | ✓ | ✓ | 2 |   | 85 | 12 | 202 |   |
 | `ImageDeselectedEvent` | ✓ | ✓ |   |   | 3 | ✓ | 0 | 0 | 0 |   |
@@ -361,7 +366,7 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 | `SlashMenu` | ✓ | ✓ | ✓ | ✓ | 1 |   | 0 | 0 | 1 |   |
 | `StoryLocator` | ✓ | ✓ |   |   | 1 | ✓ | 123 | 0 | 3 |   |
 | `SuperConverter` | ✓ | ✓ | ✓ | ✓ | 1 |   | 0 | 0 | 3 | ✓ |
-| `SuperDoc` | ✓ | ✓ | ✓ | ✓ | 21 |   | 1034 | 187 | 249 | ✓ |
+| `SuperDoc` | ✓ | ✓ | ✓ | ✓ | 22 |   | 1034 | 187 | 249 | ✓ |
 | `SuperDocAwarenessUpdatePayload` | ✓ | ✓ |   |   | 2 |   | 0 | 0 | 0 |   |
 | `SuperDocCommentsUpdatePayload` | ✓ | ✓ |   |   | 2 |   | 0 | 0 | 0 |   |
 | `SuperDocEditorPayload` | ✓ | ✓ |   |   | 2 |   | 0 | 0 | 0 |   |
@@ -369,6 +374,7 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 | `SuperDocExceptionPayload` | ✓ | ✓ |   |   | 2 |   | 0 | 0 | 0 |   |
 | `SuperDocExceptionRestorePayload` | ✓ | ✓ |   |   | 1 |   | 0 | 0 | 0 |   |
 | `SuperDocExceptionStorePayload` | ✓ | ✓ |   |   | 2 |   | 0 | 0 | 0 |   |
+| `SuperDocFontsApi` | ✓ | ✓ |   |   | 1 |   | 0 | 0 | 0 |   |
 | `SuperDocLayoutEngineOptions` | ✓ | ✓ |   |   | 2 | ✓ | 0 | 0 | 0 |   |
 | `SuperDocLockedPayload` | ✓ | ✓ |   |   | 2 |   | 0 | 0 | 0 |   |
 | `SuperDocReadyPayload` | ✓ | ✓ |   |   | 2 |   | 2 | 0 | 0 |   |
@@ -391,8 +397,8 @@ Source: packed and installed `tests/consumer-typecheck/node_modules/superdoc`
 | `TextSegment` | ✓ | ✓ |   |   | 3 | ✓ | 8 | 0 | 4 |   |
 | `TextTarget` | ✓ | ✓ |   |   | 3 | ✓ | 45 | 0 | 10 |   |
 | `Toolbar` | ✓ | ✓ | ✓ | ✓ | 1 |   | 35 | 7 | 15 |   |
-| `TrackChangeAuthor` | ✓ | ✓ |   |   | 0 | ✓ | 0 | 0 | 0 |   |
-| `TrackChangesAuthorColorsConfig` | ✓ | ✓ |   |   | 0 | ✓ | 0 | 0 | 0 |   |
+| `TrackChangeAuthor` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
+| `TrackChangesAuthorColorsConfig` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
 | `TrackChangesBasePluginKey` | ✓ | ✓ | ✓ | ✓ | 2 |   | 0 | 0 | 1 | ✓ |
 | `TrackChangesModuleConfig` | ✓ | ✓ |   |   | 1 | ✓ | 0 | 0 | 0 |   |
 | `TrackedChangeAddress` | ✓ | ✓ |   |   | 1 | ✓ | 13 | 0 | 3 |   |
