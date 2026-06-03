@@ -28,8 +28,7 @@ export interface FontsResolvedPayload {
  * Payload for `fonts-changed` events: the authoritative, substitution- and load-aware
  * font report for the current document. Emitted after the load-before-measure gate
  * settles (`source: 'initial'`), again when a face arrives after a timed-out first paint
- * (`'late-load'`), and on a runtime font config change (`'config-change'`, with the write
- * API). `version` is the document's font-config epoch; it increases on every change.
+ * (`'late-load'`). `version` is the document's font-config epoch; it increases on every change.
  *
  * `documentFonts` are the document's DECLARED logical families (font table + theme +
  * defaults), deduped - not only the fonts visible on screen. (A separate rendered-fonts
@@ -42,7 +41,7 @@ export interface FontsChangedPayload {
   resolutions: FontResolutionRecord[];
   missingFonts: string[];
   loadSummary: FontLoadSummary;
-  source: 'initial' | 'late-load' | 'config-change';
+  source: 'initial' | 'late-load';
   version: number;
 }
 

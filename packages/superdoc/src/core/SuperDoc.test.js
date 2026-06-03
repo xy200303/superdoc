@@ -999,6 +999,98 @@ describe('SuperDoc core', () => {
       editorB.emit('fonts-changed', reportB);
       expect(received).toEqual([reportB]); // only B, via the subscription
     });
+
+    it('fonts.getReport / getMissingFonts / getDocumentFonts read the active editor report', async () => {
+      const instance = await makeInstance();
+      const report = [
+        { logicalFamily: 'Calibri', physicalFamily: 'Carlito', status: 'loaded' },
+        { logicalFamily: 'Aptos', physicalFamily: 'Aptos', status: 'fallback' },
+      ];
+      const editor = makeEmitterEditor({
+        presentationEditor: {
+          getFontReport: () => report,
+          getMissingFonts: () => ['Aptos'],
+          getLastFontsChangedPayload: () => null,
+        },
+      });
+      instance.activeEditor = editor;
+
+      expect(instance.fonts.getReport()).toBe(report);
+      expect(instance.fonts.getMissingFonts()).toEqual(['Aptos']);
+      // getDocumentFonts maps the report to logical family names.
+      expect(instance.fonts.getDocumentFonts()).toEqual(['Calibri', 'Aptos']);
+    });
+
+    it('fonts.* return empty arrays when no editor is active', async () => {
+      const instance = await makeInstance();
+      instance.activeEditor = null;
+
+      expect(instance.fonts.getReport()).toEqual([]);
+      expect(instance.fonts.getMissingFonts()).toEqual([]);
+      expect(instance.fonts.getDocumentFonts()).toEqual([]);
+    });
+
+    it('does not relay fonts-changed from an editor that is no longer active', async () => {
+      const instance = await makeInstance();
+      const oldEditor = makeEmitterEditor();
+      const newEditor = makeEmitterEditor();
+      instance.broadcastEditorCreate(oldEditor);
+      instance.broadcastEditorCreate(newEditor);
+      instance.activeEditor = newEditor; // document swap: newEditor is the active document
+
+      const received = [];
+      instance.on('fonts-changed', (p) => received.push(p));
+
+      // The old (inactive) editor finishes a timed-out font and emits late.
+      oldEditor.emit('fonts-changed', {
+        documentFonts: ['Calibri'],
+        resolutions: [],
+        missingFonts: [],
+        loadSummary: { loaded: 1, failed: 0, timedOut: 0, fallbackUsed: 0, results: [] },
+        source: 'late-load',
+        version: 9,
+      });
+      expect(received).toEqual([]); // dropped: not the active editor
+
+      // The active editor's report still surfaces.
+      const activePayload = {
+        documentFonts: ['Cambria'],
+        resolutions: [],
+        missingFonts: [],
+        loadSummary: { loaded: 1, failed: 0, timedOut: 0, fallbackUsed: 0, results: [] },
+        source: 'late-load',
+        version: 1,
+      };
+      newEditor.emit('fonts-changed', activePayload);
+      expect(received).toEqual([activePayload]);
+    });
+
+    it('does not replay a cached report when an inactive editor is created', async () => {
+      const instance = await makeInstance();
+      const activeEditor = makeEmitterEditor();
+      instance.activeEditor = activeEditor;
+      instance.broadcastEditorCreate(activeEditor); // active editor, no cached payload
+
+      const received = [];
+      instance.on('fonts-changed', (p) => received.push(p));
+
+      // A different, non-active editor is created and already has a cached report. Its
+      // replay-on-wire must obey the same active-editor rule as the live event.
+      const stale = {
+        documentFonts: ['Calibri'],
+        resolutions: [],
+        missingFonts: [],
+        loadSummary: { loaded: 1, failed: 0, timedOut: 0, fallbackUsed: 0, results: [] },
+        source: 'initial',
+        version: 0,
+      };
+      const inactiveEditor = makeEmitterEditor({
+        presentationEditor: { getLastFontsChangedPayload: () => stale },
+      });
+      instance.broadcastEditorCreate(inactiveEditor);
+
+      expect(received).toEqual([]); // cached replay from the inactive editor dropped
+    });
   });
 
   it('uses visible search model in SuperDoc.search()', async () => {

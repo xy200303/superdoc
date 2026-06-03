@@ -50,6 +50,7 @@ def metric_fingerprint(font):
 
 
 def main():
+    allow_skips = os.environ.get("ALLOW_SKIPS") == "1" or "--allow-skips" in sys.argv
     ok = True
     skipped = 0
     for family in FAMILIES:
@@ -69,9 +70,18 @@ def main():
             ok = ok and same
     print()
     if skipped:
-        print(f"WARNING: {skipped} face(s) skipped (no source .ttf) - not fully verified")
-    print("ALL METRICS PRESERVED" if ok else "METRIC VERIFICATION FAILED")
-    return 0 if ok else 1
+        note = "permitted via ALLOW_SKIPS" if allow_skips else "set TTF_SRC_DIR, or pass --allow-skips to permit"
+        print(f"WARNING: {skipped} face(s) skipped, no source .ttf ({note})")
+    # A CI gate must never report success after validating nothing: missing source files
+    # fail the run unless skips are explicitly opted into (ALLOW_SKIPS=1 / --allow-skips).
+    passed = ok and (skipped == 0 or allow_skips)
+    if passed and skipped == 0:
+        print("ALL METRICS PRESERVED")
+    elif passed:
+        print("PARTIAL: metrics preserved for verified faces; some skipped")
+    else:
+        print("METRIC VERIFICATION FAILED")
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":

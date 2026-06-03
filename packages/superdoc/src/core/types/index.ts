@@ -96,10 +96,11 @@ export interface SuperDocFontsApi {
   /** The document's declared logical font families, deduped. */
   getDocumentFonts(): string[];
   /**
-   * Observe the font report: invokes `callback` immediately with the current report (if one
-   * has resolved) and then on every change. Use this rather than `on('fonts-changed')` when
-   * you may subscribe after the report resolved or after a document swap - it delivers the
-   * current state regardless of timing. Returns an unsubscribe function.
+   * Observe the font report: replays the current report immediately if one has already
+   * resolved, then invokes `callback` on every future change. Use this rather than
+   * `on('fonts-changed')` when you may subscribe after the report resolved. Note: right after
+   * a document swap, if the new active editor has not produced a report yet, nothing is
+   * delivered until it does (no stale prior-document report). Returns an unsubscribe function.
    */
   onReport(callback: (payload: FontsChangedPayload) => void): () => void;
 }

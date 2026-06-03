@@ -2936,9 +2936,16 @@ describe('PresentationEditor', () => {
     });
 
     it('emits headerFooterEditBlocked when keyboard shortcut has no matching region', async () => {
-      const layoutNoHeaders = buildLayoutResult();
-      layoutNoHeaders.headers = [];
-      mockIncrementalLayout.mockResolvedValueOnce(layoutNoHeaders);
+      // Header/footer regions are derived from the resolved layout's PAGES
+      // (HeaderFooterSessionManager.rebuildRegions builds one region per page), not
+      // from the headers[] array. To exercise the "no matching region" path the
+      // resolved layout must have no page 0 at all; emptying headers[] still leaves a
+      // per-page region and takes the activation path instead. With no pages,
+      // getRegionForPage('header', 0) returns null deterministically, independent of
+      // render timing.
+      const layoutNoPages = buildLayoutResult();
+      layoutNoPages.layout.pages = [];
+      mockIncrementalLayout.mockResolvedValueOnce(layoutNoPages);
 
       const blockedSpy = vi.fn();
 
@@ -2950,13 +2957,6 @@ describe('PresentationEditor', () => {
       editor.on('headerFooterEditBlocked', blockedSpy);
 
       await vi.waitFor(() => expect(mockIncrementalLayout).toHaveBeenCalled());
-
-      // Wait for the async rendering to apply the layout before the shortcut, so the
-      // header/footer session can see there is no matching region (matches the sibling
-      // tests' settle step). The load-before-measure font gate adds an await ahead of
-      // incrementalLayout, so dispatching on "incrementalLayout called" alone races the
-      // layout-applied state.
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
       container.dispatchEvent(
         new KeyboardEvent('keydown', { ctrlKey: true, altKey: true, code: 'KeyH', bubbles: true }),

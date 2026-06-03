@@ -33,7 +33,14 @@ export default function bundledFontsPlugin() {
         res.setHeader('Content-Type', contentType(name));
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Cache-Control', 'no-cache');
-        fs.createReadStream(file).pipe(res);
+        const stream = fs.createReadStream(file);
+        // A mid-read failure would otherwise emit an unhandled 'error' on the stream and
+        // take down the dev server. Respond 500 if nothing was sent yet, then close.
+        stream.on('error', () => {
+          if (!res.headersSent) res.statusCode = 500;
+          res.end();
+        });
+        stream.pipe(res);
       });
     },
 

@@ -49,9 +49,9 @@ export interface FontReadinessGateOptions {
    */
   getFontEnvironment?: () => FontEnvironment | null;
   /**
-   * Map logical families to the physical families that must actually load. Identity until
-   * the resolver lands (T1); then this becomes the logical->physical map so the gate waits on
-   * the real substitute (e.g. Calibri -> Carlito).
+   * Map logical families to the physical families that must actually load: the
+   * logical->physical map so the gate waits on the real substitute (e.g. Calibri -> Carlito).
+   * Defaults to identity when not provided; the editor wires `resolvePhysicalFamilies`.
    */
   resolveFamilies?: (families: string[]) => string[];
   /** Per-font load budget before a face is treated as timed out. */
