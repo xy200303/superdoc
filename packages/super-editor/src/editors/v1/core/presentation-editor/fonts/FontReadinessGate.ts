@@ -291,13 +291,16 @@ export class FontReadinessGate {
     this.#resetRequiredAndSeen();
   }
 
-  /** Clear the per-document required + seen face/family sets and the required-set signature. */
+  /** Clear the per-document required + seen face/family sets, the signature, and the cached
+   *  summary, so the next readiness pass cannot reuse the prior document's diagnostics (an
+   *  empty/no-text new document would otherwise short-circuit to the stale summary). */
   #resetRequiredAndSeen(): void {
     this.#requiredSignature = '';
     this.#requiredFaceKeys = new Set();
     this.#requiredFamilies = new Set();
     this.#seenAvailable.clear();
     this.#seenAvailableFaces.clear();
+    this.#lastSummary = null;
   }
 
   /** Remove the late-load listener and cancel any pending batched reflow. Call on teardown. */

@@ -113,4 +113,33 @@ describe('FontLateLoadReflowScheduler', () => {
     expect(flushes[1].reason).toBe('quiet');
     expect(flushes[1].faceKeys).toEqual(['b']);
   });
+
+  it('a throwing flush does not escape the timer callback and still arms the cooldown', () => {
+    const clock = makeClock();
+    let throwOnce = true;
+    const reasons: string[] = [];
+    const scheduler = new FontLateLoadReflowScheduler({
+      quietMs: 250,
+      cooldownMs: 2000,
+      flush: (d) => {
+        if (throwOnce) {
+          throwOnce = false;
+          throw new Error('flush blew up');
+        }
+        reasons.push(d.reason);
+      },
+      scheduleTimeout: clock.scheduleTimeout,
+      cancelTimeout: clock.cancelTimeout,
+    });
+
+    scheduler.schedule(['a']);
+    // The quiet flush throws; advancing the timers must NOT surface an uncaught exception.
+    expect(() => clock.advance(300)).not.toThrow();
+
+    // The cooldown was still armed despite the throw: an arrival now defers to its end and a
+    // trailing flush drains it, proving the rate bound survived the throwing flush.
+    scheduler.schedule(['b']);
+    clock.advance(2100);
+    expect(reasons).toEqual(['throttle']);
+  });
 });

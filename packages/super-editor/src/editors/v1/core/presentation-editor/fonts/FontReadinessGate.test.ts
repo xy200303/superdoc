@@ -397,5 +397,33 @@ describe('FontReadinessGate', () => {
       expect(registry.awaitCalls).toEqual([['Carlito']]);
       expect(summary.loaded).toBe(1);
     });
+
+    it('resetForDocumentChange clears the cached summary so an empty new document does not reuse it', async () => {
+      const REGULAR: FontFaceRequest = { family: 'Carlito', weight: '400', style: 'normal' };
+      registry.faceStatuses.set(faceKey(REGULAR), 'loaded');
+      let faces: FontFaceRequest[] = [REGULAR];
+      const gate = new FontReadinessGate({
+        registry: registry.asRegistry(),
+        getDocumentFonts: () => [],
+        getRequiredFaces: () => faces,
+        requestReflow,
+        invalidateCaches,
+        getFontEnvironment: () => ({ fontSet: fontSet.asFontSet(), FontFaceCtor: fakeCtor }),
+        timeoutMs: 1000,
+        scheduleTimeout: clock.scheduleTimeout,
+        cancelTimeout: clock.cancelTimeout,
+      });
+
+      const first = await gate.ensureReadyForMeasure();
+      expect(first.loaded).toBe(1); // Carlito loaded for the first document
+
+      // Swap to a document with no required faces. With #lastSummary uncleared, the empty
+      // plan short-circuits to the prior summary; the reset must prevent that.
+      gate.resetForDocumentChange();
+      faces = [];
+      const second = await gate.ensureReadyForMeasure();
+      expect(second.loaded).toBe(0);
+      expect(second.results).toEqual([]);
+    });
   });
 });

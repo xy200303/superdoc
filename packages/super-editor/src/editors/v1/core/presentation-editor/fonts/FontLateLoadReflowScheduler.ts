@@ -125,9 +125,12 @@ export class FontLateLoadReflowScheduler {
         this.#pending.clear();
         this.#flush({ reason, faceKeys });
       }
+    } catch {
+      // #doFlush runs inside a timer callback, so a throwing flush would surface as an
+      // uncaught exception. Font readiness must not break layout - swallow it; the correction
+      // self-heals on the next schedule().
     } finally {
-      // Always arm the cooldown, even if #flush throws, so the flush rate stays bounded and a
-      // timer callback never leaks an uncaught exception (font readiness must not break layout).
+      // Always arm the cooldown, even when a flush throws, so the flush rate stays bounded.
       this.#cooldownHandle = this.#scheduleTimeout(() => this.#onCooldownElapsed(), this.#cooldownMs);
     }
   }
