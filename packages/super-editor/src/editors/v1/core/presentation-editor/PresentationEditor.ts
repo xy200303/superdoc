@@ -540,16 +540,18 @@ export class PresentationEditor extends EventEmitter {
   /**
    * This document's logical->physical font resolver. Per-instance (per document) so two
    * editors can map the same logical family differently without leaking. Planner, gate, report,
-   * text MEASURE (body, footnotes, header/footer, per-rId header/footer) and text PAINT resolve
-   * through THIS instance, and its signature keys every measure cache AND every paint-reuse
-   * version, so two documents with different mappings can never share a measure or reuse each
-   * other's painted DOM. (Field-annotation pills are the one font-bearing path NOT resolved here:
-   * their line-layout measure + paint still use the logical family, exactly as on main. Unifying
-   * them changes pill rendering, so it lands with the `fonts.map` PR, not this foundation.)
-   * This is the per-document isolation foundation the customer write API
-   * (`fonts.map`/`add`/`preload`) builds on; PR1 wires the seam with no public mutators yet, so
-   * the signature stays '' and the resolver is seeded with the same bundled map - behavior-
-   * preserving by construction (resolved families, cache keys, and paint versions are unchanged).
+   * glyph-width measurement for body/notes/header/footer text, and normal text-run paint use THIS
+   * instance. Its signature is threaded into the measure caches and paint-reuse versions those
+   * paths consume.
+   *
+   * This is a partial foundation: AutoFit width metrics, line-height vertical metrics,
+   * field-annotation pill line-layout/paint, and list-marker/drop-cap paint still match main on
+   * this branch. Those paths are completed in the stacked `fonts.map` PR, where resolving them
+   * changes visible rendering.
+   *
+   * It is the per-document isolation seam the customer write API (`fonts.map`/`add`/`preload`)
+   * builds on; this PR wires the seam with no public mutators yet, so the signature stays '' and
+   * the resolver is seeded with the same bundled map - behavior-preserving on the paths above.
    */
   readonly #fontResolver = createFontResolver();
   /** Layout blocks for the current render, stashed so the gate's planner reads the live set. */
