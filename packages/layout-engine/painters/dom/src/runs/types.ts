@@ -26,6 +26,8 @@ export type RunRenderContext = {
   layoutEpoch: number;
   showFormattingMarks: boolean;
   contentControlsChrome: 'default' | 'none';
+  /** Per-document logical->physical font resolver. Undefined => global bundled default. */
+  resolvePhysical?: (cssFontFamily: string) => string;
   pendingTooltips: WeakMap<HTMLElement, string>;
   getNextLinkId: () => string;
   applySdtDataset: (el: HTMLElement | null, metadata?: SdtMetadata | null) => void;

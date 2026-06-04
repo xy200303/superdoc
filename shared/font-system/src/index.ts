@@ -29,6 +29,7 @@ export type {
 export { SETTLED_STATUSES, isSettled } from './types';
 
 export type { FontResolution, FontResolutionReason } from './resolver';
+export { FontResolver, createFontResolver } from './resolver';
 export {
   resolveFontFamily,
   resolvePhysicalFamily,

@@ -178,7 +178,7 @@ import type {
 } from '@superdoc/layout-bridge';
 
 import { measureBlock } from '@superdoc/measuring-dom';
-import { resolvePhysicalFamilies, type FontResolutionRecord, type FontLoadSummary } from '@superdoc/font-system';
+import { createFontResolver, type FontResolutionRecord, type FontLoadSummary } from '@superdoc/font-system';
 import { installBundledSubstitutes } from '@superdoc/font-system/bundled';
 import { FontReadinessGate } from './fonts/FontReadinessGate';
 import { planRequiredFontFaces } from './fonts/font-load-planner';
@@ -506,6 +506,12 @@ export class PresentationEditor extends EventEmitter {
   #layoutOptions: LayoutEngineOptions;
   #configuredDocumentBackground: DocumentBackground | undefined;
   #layoutState: LayoutState = { blocks: [], measures: [], layout: null, bookmarks: new Map() };
+  /**
+   * The font-mapping signature `#layoutState.measures` were produced with. Travels with the
+   * measures so the next render can tell incrementalLayout whether a mapping change since the
+   * prior pass invalidates previous-measure reuse (that reuse fast path bypasses the cache key).
+   */
+  #layoutFontSignature = '';
   #layoutLookupBlocks: FlowBlock[] = [];
   #layoutLookupMeasures: Measure[] = [];
   /** Cache for incremental toFlowBlocks conversion */
@@ -534,6 +540,23 @@ export class PresentationEditor extends EventEmitter {
   #selectionSync = new SelectionSyncCoordinator();
   /** Load-before-measure gate: awaits required fonts before measurement, reflows on late load. */
   #fontGate: FontReadinessGate | null = null;
+  /**
+   * This document's logical->physical font resolver. Per-instance (per document) so two
+   * editors can map the same logical family differently without leaking. Planner, gate, report,
+   * glyph-width measurement for body/notes/header/footer text, and normal text-run paint use THIS
+   * instance. Its signature is threaded into the measure caches and paint-reuse versions those
+   * paths consume.
+   *
+   * This is a partial foundation: AutoFit width metrics, line-height vertical metrics,
+   * field-annotation pill line-layout/paint, and list-marker/drop-cap paint still match main on
+   * this branch. Those paths are completed in the stacked `fonts.map` PR, where resolving them
+   * changes visible rendering.
+   *
+   * It is the per-document isolation seam the customer write API (`fonts.map`/`add`/`preload`)
+   * builds on; this PR wires the seam with no public mutators yet, so the signature stays '' and
+   * the resolver is seeded with the same bundled map - behavior-preserving on the paths above.
+   */
+  readonly #fontResolver = createFontResolver();
   /** Layout blocks for the current render, stashed so the gate's planner reads the live set. */
   #fontPlanBlocks: FlowBlock[] | null = null;
   /** Dedup key for `fonts-changed`: epoch + per-face load status. Null until the first emit. */
@@ -893,6 +916,7 @@ export class PresentationEditor extends EventEmitter {
       initBudgetMs: HEADER_FOOTER_INIT_BUDGET_MS,
       defaultPageSize: DEFAULT_PAGE_SIZE,
       defaultMargins: DEFAULT_MARGINS,
+      getFontSignature: () => this.#fontResolver.signature,
     });
     this.#headerFooterSession.setHoverElements({
       hoverOverlay: this.#hoverOverlay,
@@ -973,10 +997,11 @@ export class PresentationEditor extends EventEmitter {
         // rendered document uses, from the planner walking the current layout blocks. The
         // gate awaits these - so bold/italic load before measure and declared-but-unused
         // fonts are not fetched. Reads the blocks stashed just before each gate await.
-        getRequiredFaces: () => planRequiredFontFaces(this.#fontPlanBlocks),
-        // Fallback family path (used only if getRequiredFaces is unavailable): wait on the
-        // resolved PHYSICAL families (Calibri -> Carlito).
-        resolveFamilies: resolvePhysicalFamilies,
+        getRequiredFaces: () => planRequiredFontFaces(this.#fontPlanBlocks, this.#fontResolver),
+        // The document's resolver: the gate derives the family-path resolution from it and
+        // resolves its report through it (load + diagnostics). Measure and paint resolve through
+        // the same instance, so load, measure, paint, and diagnostics all agree.
+        fontResolver: this.#fontResolver,
         // Register the bundled substitute pack (Carlito) into the document's registry the
         // first time it resolves, so the substitute is available with no manual setup.
         onRegistryResolved: (registry) =>
@@ -3278,6 +3303,7 @@ export class PresentationEditor extends EventEmitter {
       flowMode: this.#layoutOptions.flowMode ?? 'paginated',
       blocks,
       measures,
+      fontSignature: this.#fontResolver.signature,
     });
 
     const isSemanticFlow = this.#layoutOptions.flowMode === 'semantic';
@@ -5084,10 +5110,11 @@ export class PresentationEditor extends EventEmitter {
     // header/footer descriptors against the new converter and rerender so the
     // importer tab matches the collaborator tab without waiting for an edit.
     const handleDocumentReplaced = () => {
-      // A new document reuses this gate, so drop the old document's pending late-load reflow
-      // and required-face state - otherwise a flush armed under the old document fires a
-      // spurious full reflow against the new one.
+      // A new document reuses this gate AND this resolver, so drop the old document's pending
+      // late-load reflow + required-face state and its runtime font mappings - otherwise a
+      // flush armed under the old document reflows the new one, or a prior `fonts.map` leaks in.
       this.#fontGate?.resetForDocumentChange();
+      this.#fontResolver.reset();
       this.#refreshHeaderFooterStructureThenRerender({ purgeCachedEditors: true });
     };
     this.#editor.on('documentReplaced', handleDocumentReplaced);
@@ -6766,6 +6793,14 @@ export class PresentationEditor extends EventEmitter {
       const previousBlocks = this.#layoutState.blocks;
       const previousLayout = this.#layoutState.layout;
       const previousMeasures = this.#layoutState.measures;
+      // Per-document font context for this render: bind the resolver into the measure callback
+      // (so measurement uses THIS document's physical substitutes) and capture its signature for
+      // the measure-cache keys. previousFontSignature is the signature the prior measures were
+      // produced with - if it differs, incrementalLayout must not reuse them (the reuse fast
+      // path bypasses the cache key). PR1 has no public `fonts.map`, so the signature stays ''.
+      const resolvePhysical = (css: string): string => this.#fontResolver.resolvePhysicalFamily(css);
+      const fontSignature = this.#fontResolver.signature;
+      const previousFontSignature = this.#layoutFontSignature;
 
       let layout: Layout;
       let measures: Measure[];
@@ -6816,9 +6851,11 @@ export class PresentationEditor extends EventEmitter {
           previousLayout,
           blocksForLayout,
           layoutOptions,
-          (block: FlowBlock, constraints: { maxWidth: number; maxHeight: number }) => measureBlock(block, constraints),
+          (block: FlowBlock, constraints: { maxWidth: number; maxHeight: number }) =>
+            measureBlock(block, constraints, resolvePhysical),
           headerFooterInput ?? undefined,
           previousMeasures,
+          { fontSignature, previousFontSignature },
         );
         const incrementalLayoutEnd = perfNow();
         perfLog(`[Perf] incrementalLayout: ${(incrementalLayoutEnd - incrementalLayoutStart).toFixed(2)}ms`);
@@ -6858,6 +6895,7 @@ export class PresentationEditor extends EventEmitter {
           flowMode: this.#layoutOptions.flowMode ?? 'paginated',
           blocks: bodyBlocksForPaint,
           measures: bodyMeasuresForPaint,
+          fontSignature,
         });
 
         headerLayouts = result.headers;
@@ -6886,6 +6924,9 @@ export class PresentationEditor extends EventEmitter {
       }
       const anchorMap = computeAnchorMapFromHelper(bookmarks, layout, blocksForLayout);
       this.#layoutState = { blocks: blocksForLayout, measures, layout, bookmarks, anchorMap };
+      // Record the signature these measures were produced with, so the next render can gate
+      // previous-measure reuse on whether the mapping changed (see #layoutFontSignature).
+      this.#layoutFontSignature = fontSignature;
       this.#layoutLookupBlocks = resolveBlocks;
       this.#layoutLookupMeasures = resolveMeasures;
 
@@ -7030,6 +7071,9 @@ export class PresentationEditor extends EventEmitter {
       pageGap: this.#layoutState.layout?.pageGap ?? effectiveGap,
       showFormattingMarks: this.#layoutOptions.showFormattingMarks ?? false,
       contentControlsChrome: this.#layoutOptions.contentControlsChrome ?? 'default',
+      // Paint each run in THIS document's physical substitute - the same family measurement used -
+      // so two editors that map a logical family differently never paint each other's font.
+      resolvePhysical: (css: string): string => this.#fontResolver.resolvePhysicalFamily(css),
     });
 
     // Pass the current zoom so virtualization accounts for the CSS transform scale
@@ -8178,7 +8222,7 @@ export class PresentationEditor extends EventEmitter {
     sectionMetadata: SectionMetadata[],
   ): Promise<void> {
     if (this.#headerFooterSession) {
-      await this.#headerFooterSession.layoutPerRId(headerFooterInput, layout, sectionMetadata);
+      await this.#headerFooterSession.layoutPerRId(headerFooterInput, layout, sectionMetadata, this.#fontResolver);
     }
   }
 

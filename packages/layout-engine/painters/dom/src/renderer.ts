@@ -248,6 +248,8 @@ type PainterOptions = {
   showFormattingMarks?: boolean;
   /** Built-in SDT chrome rendering mode. */
   contentControlsChrome?: 'default' | 'none';
+  /** Per-document logical->physical font resolver; see DomPainterOptions.resolvePhysical. */
+  resolvePhysical?: (cssFontFamily: string) => string;
 };
 
 type FragmentDomState = {
@@ -3972,6 +3974,8 @@ export class DomPainter {
       layoutEpoch: this.layoutEpoch,
       showFormattingMarks: this.showFormattingMarks,
       contentControlsChrome: this.contentControlsChrome,
+      // Per-document font resolver (undefined => applyRunStyles falls back to the global default).
+      resolvePhysical: this.options.resolvePhysical,
       pendingTooltips: this.pendingTooltips,
       getNextLinkId: () => `superdoc-link-${++this.linkIdCounter}`,
       applySdtDataset,

@@ -1,4 +1,4 @@
-import { resolvePrimaryPhysicalFamily, type FontFaceRequest } from '@superdoc/font-system';
+import { resolvePrimaryPhysicalFamily, type FontFaceRequest, type FontResolver } from '@superdoc/font-system';
 import type { FlowBlock, ParagraphBlock, TableBlock, ListBlock, Run } from '@superdoc/contracts';
 
 /**
@@ -13,11 +13,15 @@ import type { FlowBlock, ParagraphBlock, TableBlock, ListBlock, Run } from '@sup
  *
  * This walks the layout input (`blocksForLayout`) - which exists BEFORE measurement and
  * already carries each run's `fontFamily` + `bold`/`italic` - and emits the deduped set of
- * physical face requests. It resolves logical -> physical with `resolvePrimaryPhysicalFamily`,
- * the SAME primary resolution measure and paint use, so the planned set cannot disagree
- * with what is actually measured/painted. Declared-font diagnostics stay separate
- * (`getDocumentFonts()` / `getReport()`); this feeds loading only.
+ * physical face requests. It resolves logical -> physical with the DOCUMENT'S resolver - the
+ * same instance measure and paint will use once they are threaded onto it - so the planned/
+ * loaded set cannot disagree with what is actually measured/painted, including a per-document
+ * `fonts.map`. Declared-font diagnostics stay separate (`getDocumentFonts()` / `getReport()`);
+ * this feeds loading only.
  */
+
+/** Resolve a logical family to its bare physical face name, per the document's resolver. */
+type ResolvePrimary = (family: string) => string;
 
 /** Anything that carries a measurable text font: a run, a list marker run, etc. */
 interface FontBearing {
@@ -31,9 +35,9 @@ function faceKey(req: FontFaceRequest): string {
 }
 
 /** Collect a face request from any font-bearing object into the deduped map. */
-function collect(out: Map<string, FontFaceRequest>, node: FontBearing | null | undefined): void {
+function collect(out: Map<string, FontFaceRequest>, node: FontBearing | null | undefined, resolve: ResolvePrimary): void {
   if (!node || typeof node.fontFamily !== 'string' || !node.fontFamily) return;
-  const family = resolvePrimaryPhysicalFamily(node.fontFamily);
+  const family = resolve(node.fontFamily);
   if (!family) return;
   const req: FontFaceRequest = {
     family,
@@ -44,7 +48,7 @@ function collect(out: Map<string, FontFaceRequest>, node: FontBearing | null | u
   if (!out.has(key)) out.set(key, req);
 }
 
-function collectRuns(out: Map<string, FontFaceRequest>, runs: Run[] | undefined): void {
+function collectRuns(out: Map<string, FontFaceRequest>, runs: Run[] | undefined, resolve: ResolvePrimary): void {
   if (!runs) return;
   // Duck-typed on fontFamily so every font-bearing run kind is covered (text,
   // fieldAnnotation, dropCap, ...) - missing one would silently measure against fallback.
@@ -53,55 +57,59 @@ function collectRuns(out: Map<string, FontFaceRequest>, runs: Run[] | undefined)
     // A field annotation with no explicit font is measured against 'Arial' by the measurer
     // (its buildFontString default), so plan that face rather than skip the fontless run.
     if (run.kind === 'fieldAnnotation' && (typeof bearing.fontFamily !== 'string' || !bearing.fontFamily)) {
-      collect(out, { ...bearing, fontFamily: 'Arial' });
+      collect(out, { ...bearing, fontFamily: 'Arial' }, resolve);
     } else {
-      collect(out, bearing);
+      collect(out, bearing, resolve);
     }
   }
 }
 
-function collectParagraph(out: Map<string, FontFaceRequest>, paragraph: ParagraphBlock | undefined): void {
+function collectParagraph(
+  out: Map<string, FontFaceRequest>,
+  paragraph: ParagraphBlock | undefined,
+  resolve: ResolvePrimary,
+): void {
   if (!paragraph) return;
-  collectRuns(out, paragraph.runs);
+  collectRuns(out, paragraph.runs, resolve);
   // The word-layout list marker glyph ("1.", "•") is measured with its OWN run font
   // (attrs.wordLayout.marker.run, used by the measurer's buildFontString), which can be a
   // different family/weight/style than the item text - so it must be planned too.
-  collect(out, paragraph.attrs?.wordLayout?.marker?.run as FontBearing | undefined);
+  collect(out, paragraph.attrs?.wordLayout?.marker?.run as FontBearing | undefined, resolve);
   // A drop cap is measured from attrs.dropCapDescriptor.run (measureDropCap) with its own,
   // often distinct and large, font; the cap text is moved out of `runs`, so plan it here.
-  collect(out, paragraph.attrs?.dropCapDescriptor?.run as FontBearing | undefined);
+  collect(out, paragraph.attrs?.dropCapDescriptor?.run as FontBearing | undefined, resolve);
 }
 
-function collectTable(out: Map<string, FontFaceRequest>, table: TableBlock): void {
+function collectTable(out: Map<string, FontFaceRequest>, table: TableBlock, resolve: ResolvePrimary): void {
   for (const row of table.rows) {
     for (const cell of row.cells) {
-      collectParagraph(out, cell.paragraph);
-      if (cell.blocks) for (const b of cell.blocks) collectBlock(out, b as FlowBlock);
+      collectParagraph(out, cell.paragraph, resolve);
+      if (cell.blocks) for (const b of cell.blocks) collectBlock(out, b as FlowBlock, resolve);
     }
   }
 }
 
-function collectList(out: Map<string, FontFaceRequest>, list: ListBlock): void {
+function collectList(out: Map<string, FontFaceRequest>, list: ListBlock, resolve: ResolvePrimary): void {
   for (const item of list.items) {
     // collectParagraph covers the item text AND any word-layout marker font on the
     // paragraph's attrs. The ListBlock-level `item.marker` (ListMarker) carries no font of
     // its own - that glyph is measured with the paragraph font, already collected here.
-    collectParagraph(out, item.paragraph);
+    collectParagraph(out, item.paragraph, resolve);
   }
 }
 
-function collectBlock(out: Map<string, FontFaceRequest>, block: FlowBlock): void {
+function collectBlock(out: Map<string, FontFaceRequest>, block: FlowBlock, resolve: ResolvePrimary): void {
   switch (block.kind) {
     case 'paragraph':
       // Via collectParagraph (not collectRuns) so a top-level paragraph's word-layout
       // marker run font is collected too, not just its text runs.
-      collectParagraph(out, block);
+      collectParagraph(out, block, resolve);
       break;
     case 'table':
-      collectTable(out, block);
+      collectTable(out, block, resolve);
       break;
     case 'list':
-      collectList(out, block);
+      collectList(out, block, resolve);
       break;
     default:
       // image/drawing/section/page/column breaks carry no measurable text font.
@@ -113,10 +121,17 @@ function collectBlock(out: Map<string, FontFaceRequest>, block: FlowBlock): void
  * The deduped physical face requests the given layout blocks actually render. The caller
  * passes every block this render measures - body, notes, header/footer, and (in paginated
  * mode) footnotes - so each measured face is planned; this function only walks what it is
- * given.
+ * given. A `resolver` (the document's) maps logical -> physical so the planned faces match
+ * measure/paint; without one it falls back to the shared bundled map.
  */
-export function planRequiredFontFaces(blocks: readonly FlowBlock[] | null | undefined): FontFaceRequest[] {
+export function planRequiredFontFaces(
+  blocks: readonly FlowBlock[] | null | undefined,
+  resolver?: FontResolver,
+): FontFaceRequest[] {
+  const resolve: ResolvePrimary = resolver
+    ? (family) => resolver.resolvePrimaryPhysicalFamily(family)
+    : resolvePrimaryPhysicalFamily;
   const out = new Map<string, FontFaceRequest>();
-  if (blocks) for (const block of blocks) collectBlock(out, block);
+  if (blocks) for (const block of blocks) collectBlock(out, block, resolve);
   return [...out.values()];
 }

@@ -10,6 +10,7 @@ import {
   type FontLoadSummary,
   type FontLoadStatus,
   type FontResolutionRecord,
+  type FontResolver,
 } from '@superdoc/font-system';
 
 export type { FontLoadSummary } from '@superdoc/font-system';
@@ -55,6 +56,14 @@ export interface FontReadinessGateOptions {
    * Defaults to identity when not provided; the editor wires `resolvePhysicalFamilies`.
    */
   resolveFamilies?: (families: string[]) => string[];
+  /**
+   * The document's font resolver. When provided, `resolveFamilies` defaults to it and the
+   * report resolves through it, so the gate honors a per-document `fonts.map`. Text measure and
+   * paint resolve through the same instance, so load, measure, paint, and diagnostics agree for
+   * text runs. (Field-annotation pills still measure/paint the logical family - pre-existing on
+   * main; unified in the `fonts.map` PR.)
+   */
+  fontResolver?: FontResolver;
   /** Per-font load budget before a face is treated as timed out. */
   timeoutMs?: number;
   /** Explicit registry override (tests). Normally derived from the font environment. */
@@ -97,6 +106,7 @@ export class FontReadinessGate {
   readonly #getDocumentFonts: () => string[];
   readonly #getRequiredFaces: (() => FontFaceRequest[]) | null;
   readonly #resolveFamilies: (families: string[]) => string[];
+  readonly #fontResolver: FontResolver | null;
   readonly #requestReflow: () => void;
   readonly #getFontEnvironment: () => FontEnvironment | null;
   readonly #registryOverride: FontRegistry | null;
@@ -124,7 +134,11 @@ export class FontReadinessGate {
   constructor(options: FontReadinessGateOptions) {
     this.#getDocumentFonts = options.getDocumentFonts;
     this.#getRequiredFaces = options.getRequiredFaces ?? null;
-    this.#resolveFamilies = options.resolveFamilies ?? ((families) => families);
+    this.#fontResolver = options.fontResolver ?? null;
+    const resolver = this.#fontResolver;
+    this.#resolveFamilies =
+      options.resolveFamilies ??
+      (resolver ? (families) => resolver.resolvePhysicalFamilies(families) : (families) => families);
     this.#requestReflow = options.requestReflow;
     this.#getFontEnvironment = options.getFontEnvironment ?? defaultFontEnvironment;
     this.#registryOverride = options.registry ?? null;
@@ -167,7 +181,7 @@ export class FontReadinessGate {
     } catch {
       return [];
     }
-    return buildFontReport(logical, this.#resolveContext().registry);
+    return buildFontReport(logical, this.#resolveContext().registry, this.#fontResolver ?? undefined);
   }
 
   /**

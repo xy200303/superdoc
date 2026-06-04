@@ -227,21 +227,20 @@ function cloneBlockWithResolvedTokens(
     // Check if this run has a page token
     if ('token' in run && run.token) {
       if (run.token === 'pageNumber') {
-        const resolvedText =
-          run.pageNumberFieldFormat
-            ? formatChapterPageNumberText({
-                pageComponent: formatPageNumberFieldValue(displayPageInfo.displayNumber, run.pageNumberFieldFormat),
+        const resolvedText = run.pageNumberFieldFormat
+          ? formatChapterPageNumberText({
+              pageComponent: formatPageNumberFieldValue(displayPageInfo.displayNumber, run.pageNumberFieldFormat),
+              chapterNumberText: displayPageInfo.chapterNumberText,
+              chapterSeparator: displayPageInfo.chapterSeparator,
+            })
+          : displayPageInfo.chapterNumberText
+            ? formatSectionPageNumberText({
+                displayNumber: displayPageInfo.displayNumber,
+                pageFormat: displayPageInfo.pageFormat ?? 'decimal',
                 chapterNumberText: displayPageInfo.chapterNumberText,
                 chapterSeparator: displayPageInfo.chapterSeparator,
               })
-            : displayPageInfo.chapterNumberText
-              ? formatSectionPageNumberText({
-                  displayNumber: displayPageInfo.displayNumber,
-                  pageFormat: displayPageInfo.pageFormat ?? 'decimal',
-                  chapterNumberText: displayPageInfo.chapterNumberText,
-                  chapterSeparator: displayPageInfo.chapterSeparator,
-                })
-              : displayPageInfo.displayText;
+            : displayPageInfo.displayText;
         changed ||= run.text !== resolvedText;
         return {
           ...run,

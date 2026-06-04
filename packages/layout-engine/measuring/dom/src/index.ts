@@ -306,6 +306,13 @@ function getCanvasContext(): CanvasRenderingContext2D {
 }
 
 /**
+ * Resolve a logical CSS font-family value to its physical render family. Threaded from the
+ * caller so measurement uses THIS document's resolver (honoring a per-document `fonts.map`);
+ * defaults to the global bundled map for callers without a document context.
+ */
+type ResolvePhysical = (cssFontFamily: string) => string;
+
+/**
  * Build a CSS font string from Run styling properties
  *
  * @example
@@ -314,7 +321,10 @@ function getCanvasContext(): CanvasRenderingContext2D {
  * // Returns: { font: "italic bold 16px Arial", fontFamily: "Arial" }
  * ```
  */
-function buildFontString(run: { fontFamily: string; fontSize: number; bold?: boolean; italic?: boolean }): {
+function buildFontString(
+  run: { fontFamily: string; fontSize: number; bold?: boolean; italic?: boolean },
+  resolvePhysical: ResolvePhysical = resolvePhysicalFamily,
+): {
   font: string;
   fontFamily: string;
 } {
@@ -325,9 +335,10 @@ function buildFontString(run: { fontFamily: string; fontSize: number; bold?: boo
   parts.push(`${run.fontSize}px`);
 
   // Resolve the logical family (e.g. "Calibri") to the physical render family
-  // (e.g. "Carlito") so text is MEASURED in the same font it is painted with. The
-  // measure cache keys on this font string, so the physical family is in the key.
-  const physicalFamily = resolvePhysicalFamily(run.fontFamily);
+  // (e.g. "Carlito") so text is MEASURED in the same font it is painted with, using THIS
+  // document's resolver so a per-document `fonts.map` is honored. The measure cache keys
+  // on this font string, so the physical family is in the key.
+  const physicalFamily = resolvePhysical(run.fontFamily);
 
   if (measurementConfig.mode === 'deterministic') {
     // Deterministic mode still flattens to one family for reproducible server-side
@@ -701,6 +712,7 @@ function measureTabAlignmentGroup(
   runs: Run[],
   ctx: CanvasRenderingContext2D,
   decimalSeparator: string = '.',
+  resolvePhysical: ResolvePhysical = resolvePhysicalFamily,
 ): TabAlignmentGroupMeasure {
   const result: TabAlignmentGroupMeasure = {
     totalWidth: 0,
@@ -731,7 +743,7 @@ function measureTabAlignmentGroup(
       const text = textRun.text || '';
 
       if (text.length > 0) {
-        const { font } = buildFontString(textRun);
+        const { font } = buildFontString(textRun, resolvePhysical);
         const width = measureRunWidth(text, font, ctx, textRun, 0);
 
         // For decimal alignment, find the decimal position
@@ -783,12 +795,15 @@ function measureTabAlignmentGroup(
     // Measure field annotation runs
     if (isFieldAnnotationRun(run)) {
       const fontSize = (run as { fontSize?: number }).fontSize ?? DEFAULT_FIELD_ANNOTATION_FONT_SIZE;
-      const { font } = buildFontString({
-        fontFamily: (run as { fontFamily?: string }).fontFamily ?? 'Arial',
-        fontSize,
-        bold: (run as { bold?: boolean }).bold,
-        italic: (run as { italic?: boolean }).italic,
-      });
+      const { font } = buildFontString(
+        {
+          fontFamily: (run as { fontFamily?: string }).fontFamily ?? 'Arial',
+          fontSize,
+          bold: (run as { bold?: boolean }).bold,
+          italic: (run as { italic?: boolean }).italic,
+        },
+        resolvePhysical,
+      );
       const textWidth = run.displayLabel ? measureRunWidth(run.displayLabel, font, ctx, run, 0) : 0;
       const pillWidth = textWidth + FIELD_ANNOTATION_PILL_PADDING;
 
@@ -829,7 +844,11 @@ function measureTabAlignmentGroup(
  * // Result: { lines: [...], totalHeight: 19.2 }
  * ```
  */
-export async function measureBlock(block: FlowBlock, constraints: number | MeasureConstraints): Promise<Measure> {
+export async function measureBlock(
+  block: FlowBlock,
+  constraints: number | MeasureConstraints,
+  resolvePhysical: ResolvePhysical = resolvePhysicalFamily,
+): Promise<Measure> {
   const normalized = normalizeConstraints(constraints);
 
   if (block.kind === 'drawing') {
@@ -841,11 +860,11 @@ export async function measureBlock(block: FlowBlock, constraints: number | Measu
   }
 
   if (block.kind === 'list') {
-    return measureListBlock(block, normalized);
+    return measureListBlock(block, normalized, resolvePhysical);
   }
 
   if (block.kind === 'table') {
-    return measureTableBlock(block, normalized);
+    return measureTableBlock(block, normalized, resolvePhysical);
   }
 
   // Break blocks (sectionBreak, pageBreak, columnBreak) are pass-through measures
@@ -861,10 +880,14 @@ export async function measureBlock(block: FlowBlock, constraints: number | Measu
   }
 
   // Paragraph/default
-  return measureParagraphBlock(block as ParagraphBlock, normalized.maxWidth);
+  return measureParagraphBlock(block as ParagraphBlock, normalized.maxWidth, resolvePhysical);
 }
 
-async function measureParagraphBlock(block: ParagraphBlock, maxWidth: number): Promise<ParagraphMeasure> {
+async function measureParagraphBlock(
+  block: ParagraphBlock,
+  maxWidth: number,
+  resolvePhysical: ResolvePhysical = resolvePhysicalFamily,
+): Promise<ParagraphMeasure> {
   const ctx = getCanvasContext();
   const wordLayout: WordParagraphLayoutOutput | undefined = block.attrs?.wordLayout as
     | WordParagraphLayoutOutput
@@ -907,7 +930,7 @@ async function measureParagraphBlock(block: ParagraphBlock, maxWidth: number): P
           bold: wordLayout.marker.run.bold,
           italic: wordLayout.marker.run.italic,
         };
-        const { font: markerFont } = buildFontString(markerRun);
+        const { font: markerFont } = buildFontString(markerRun, resolvePhysical);
         const markerText = wordLayout.marker.markerText ?? '';
         const glyphWidth = markerText ? measureText(markerText, markerFont, ctx) : 0;
         const gutter =
@@ -1021,7 +1044,7 @@ async function measureParagraphBlock(block: ParagraphBlock, maxWidth: number): P
         bold: marker.run?.bold ?? false,
         italic: marker.run?.italic ?? false,
       };
-      const { font: markerFont } = buildFontString(markerRun);
+      const { font: markerFont } = buildFontString(markerRun, resolvePhysical);
       return measureText(markerText, markerFont, ctx);
     },
   );
@@ -1070,7 +1093,7 @@ async function measureParagraphBlock(block: ParagraphBlock, maxWidth: number): P
     if (!dropCapDescriptor.run || !dropCapDescriptor.run.text || !dropCapDescriptor.lines) {
       console.warn('Invalid drop cap descriptor - missing required fields:', dropCapDescriptor);
     } else {
-      const dropCapMeasured = measureDropCap(ctx, dropCapDescriptor, spacing);
+      const dropCapMeasured = measureDropCap(ctx, dropCapDescriptor, spacing, resolvePhysical);
       dropCapMeasure = dropCapMeasured;
 
       // Update the descriptor with measured dimensions
@@ -1434,6 +1457,7 @@ async function measureParagraphBlock(block: ParagraphBlock, maxWidth: number): P
     const keptText = sliceText.slice(0, Math.max(0, sliceText.length - trimCount));
     const { font } = buildFontString(
       lastRun as { fontFamily: string; fontSize: number; bold?: boolean; italic?: boolean },
+      resolvePhysical,
     );
     const fullWidth = measureRunWidth(sliceText, font, ctx, lastRun, sliceStart);
     const keptWidth = keptText.length > 0 ? measureRunWidth(keptText, font, ctx, lastRun, sliceStart) : 0;
@@ -1694,7 +1718,13 @@ async function measureParagraphBlock(block: ParagraphBlock, maxWidth: number): P
         // to properly align ALL content until the next tab or end of line
         if (stop.val === 'end' || stop.val === 'center' || stop.val === 'decimal') {
           // Measure all content from the next run until the next tab or end of paragraph
-          const groupMeasure = measureTabAlignmentGroup(runIndex + 1, runsToProcess, ctx, decimalSeparator);
+          const groupMeasure = measureTabAlignmentGroup(
+            runIndex + 1,
+            runsToProcess,
+            ctx,
+            decimalSeparator,
+            resolvePhysical,
+          );
 
           if (groupMeasure.totalWidth > 0) {
             // Calculate the aligned starting X position based on total group width
@@ -2070,7 +2100,7 @@ async function measureParagraphBlock(block: ParagraphBlock, maxWidth: number): P
     }
 
     if (isEmptySdtPlaceholderRun(run)) {
-      const placeholderFont = buildFontString(run).font;
+      const placeholderFont = buildFontString(run, resolvePhysical).font;
       const placeholderText = applyTextTransform(EMPTY_SDT_PLACEHOLDER_TEXT, run);
       const measuredPlaceholderWidth = getMeasuredTextWidth(
         placeholderText,
@@ -2150,7 +2180,7 @@ async function measureParagraphBlock(block: ParagraphBlock, maxWidth: number): P
     // Handle text runs
     lastFontSize = run.fontSize;
     hasSeenTextRun = true;
-    const { font } = buildFontString(run);
+    const { font } = buildFontString(run, resolvePhysical);
     const tabSegments = run.text.split('\t');
 
     let charPosInRun = 0;
@@ -2878,7 +2908,11 @@ async function measureParagraphBlock(block: ParagraphBlock, maxWidth: number): P
   };
 }
 
-async function measureTableBlock(block: TableBlock, constraints: MeasureConstraints): Promise<TableMeasure> {
+async function measureTableBlock(
+  block: TableBlock,
+  constraints: MeasureConstraints,
+  resolvePhysical: ResolvePhysical = resolvePhysicalFamily,
+): Promise<TableMeasure> {
   const maxWidth = typeof constraints === 'number' ? constraints : constraints.maxWidth;
   const workingInput = buildAutoFitWorkingGridInput(block, { maxWidth });
   const columnWidths = await resolveRuntimeTableColumnWidths(block, workingInput);
@@ -2990,7 +3024,7 @@ async function measureTableBlock(block: TableBlock, constraints: MeasureConstrai
 
       for (let blockIndex = 0; blockIndex < cellBlocks.length; blockIndex++) {
         const block = cellBlocks[blockIndex];
-        const measure = await measureBlock(block, { maxWidth: contentWidth, maxHeight: Infinity });
+        const measure = await measureBlock(block, { maxWidth: contentWidth, maxHeight: Infinity }, resolvePhysical);
         blockMeasures.push(measure);
         // Get height from different measure types
         const blockHeight = 'totalHeight' in measure ? measure.totalHeight : 'height' in measure ? measure.height : 0;
@@ -3401,7 +3435,11 @@ function normalizeConstraints(constraints: number | MeasureConstraints): Measure
   return constraints;
 }
 
-async function measureListBlock(block: ListBlock, constraints: MeasureConstraints): Promise<ListMeasure> {
+async function measureListBlock(
+  block: ListBlock,
+  constraints: MeasureConstraints,
+  resolvePhysical: ResolvePhysical = resolvePhysicalFamily,
+): Promise<ListMeasure> {
   const ctx = getCanvasContext();
   const items = [];
   let totalHeight = 0;
@@ -3427,14 +3465,14 @@ async function measureListBlock(block: ListBlock, constraints: MeasureConstraint
         italic: marker.run.italic,
         letterSpacing: marker.run.letterSpacing,
       };
-      const { font: markerFont } = buildFontString(markerFontRun);
+      const { font: markerFont } = buildFontString(markerFontRun, resolvePhysical);
       markerTextWidth = marker.markerText ? measureText(marker.markerText, markerFont, ctx) : 0;
       markerWidth = 0;
       indentLeft = (wordLayout as WordParagraphLayoutOutput).indentLeftPx ?? 0;
     } else {
       // Fallback: legacy behavior for backwards compatibility
       const markerFontRun = getPrimaryRun(item.paragraph);
-      const { font: markerFont } = buildFontString(markerFontRun);
+      const { font: markerFont } = buildFontString(markerFontRun, resolvePhysical);
       const markerText = item.marker.text ?? '';
       markerTextWidth = markerText ? measureText(markerText, markerFont, ctx) : 0;
       indentLeft = resolveIndentLeft(item);
@@ -3445,7 +3483,7 @@ async function measureListBlock(block: ListBlock, constraints: MeasureConstraint
     // Account for both indentLeft and marker width so paragraph text wraps correctly
     const paragraphWidth = Math.max(1, constraints.maxWidth - indentLeft - markerWidth);
 
-    const paragraphMeasure = await measureParagraphBlock(item.paragraph, paragraphWidth);
+    const paragraphMeasure = await measureParagraphBlock(item.paragraph, paragraphWidth, resolvePhysical);
     totalHeight += paragraphMeasure.totalHeight;
 
     items.push({
@@ -3731,16 +3769,20 @@ const measureDropCap = (
   ctx: CanvasRenderingContext2D,
   descriptor: DropCapDescriptor,
   spacing?: ParagraphSpacing,
+  resolvePhysical: ResolvePhysical = resolvePhysicalFamily,
 ): { width: number; height: number; lines: number; mode: 'drop' | 'margin' } => {
   const { run, lines, mode } = descriptor;
 
   // Build font string for the drop cap run
-  const { font } = buildFontString({
-    fontFamily: run.fontFamily,
-    fontSize: run.fontSize,
-    bold: run.bold,
-    italic: run.italic,
-  });
+  const { font } = buildFontString(
+    {
+      fontFamily: run.fontFamily,
+      fontSize: run.fontSize,
+      bold: run.bold,
+      italic: run.italic,
+    },
+    resolvePhysical,
+  );
 
   // Measure the text width
   ctx.font = font;

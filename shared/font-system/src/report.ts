@@ -1,4 +1,4 @@
-import { resolveFontFamily, type FontResolutionReason } from './resolver';
+import { resolveFontFamily, type FontResolutionReason, type FontResolver } from './resolver';
 import type { FontRegistry } from './registry';
 import { isSettled, type FontLoadStatus } from './types';
 
@@ -42,13 +42,19 @@ export interface FontResolutionRecord {
  * upgraded `onFontsResolved` payload are thin wrappers over this - they must not compute
  * resolution independently, or the report could disagree with what actually painted.
  */
-export function buildFontReport(logicalFamilies: Iterable<string>, registry: FontRegistry): FontResolutionRecord[] {
+export function buildFontReport(
+  logicalFamilies: Iterable<string>,
+  registry: FontRegistry,
+  resolver?: FontResolver,
+): FontResolutionRecord[] {
   const seen = new Set<string>();
   const report: FontResolutionRecord[] = [];
   for (const logical of logicalFamilies) {
     if (!logical || seen.has(logical)) continue;
     seen.add(logical);
-    const { physicalFamily, reason } = resolveFontFamily(logical);
+    // Resolve through the document's resolver so the report reflects its per-document
+    // `fonts.map`; fall back to the shared bundled map for callers without a context.
+    const { physicalFamily, reason } = resolver ? resolver.resolveFontFamily(logical) : resolveFontFamily(logical);
     const loadStatus = registry.getStatus(physicalFamily);
     report.push({
       logicalFamily: logical,
