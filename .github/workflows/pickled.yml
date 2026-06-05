@@ -71,24 +71,44 @@ jobs:
         run: mkdir -p pickled-reports
 
       - name: Run real-agent questions
+        id: questions
         run: |
           set +e
           bunx @pickled-dev/cli check . \
             --max-cells "${{ github.event.inputs.max_cells || '20' }}" \
             --output pickled-reports/questions.json
           status=$?
-          node .github/scripts/summarize-pickled-report.mjs pickled-reports/questions.json || true
-          exit "$status"
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Add question summary
+        if: always()
+        run: |
+          if [ -f pickled-reports/questions.json ]; then
+            bunx @pickled-dev/cli report pickled-reports/questions.json --format markdown >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No Pickled question receipt was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Run real-agent builds
+        id: builds
         run: |
           set +e
           bunx @pickled-dev/cli build . \
             --max-cells 4 \
             --output pickled-reports/builds.json
           status=$?
-          node .github/scripts/summarize-pickled-report.mjs pickled-reports/builds.json || true
-          exit "$status"
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Add build summary
+        if: always()
+        run: |
+          if [ -f pickled-reports/builds.json ]; then
+            bunx @pickled-dev/cli report pickled-reports/builds.json --format markdown >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No Pickled build receipt was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload Pickled reports
         if: always()
@@ -97,3 +117,15 @@ jobs:
           name: pickled-reports
           path: pickled-reports/*.json
           if-no-files-found: ignore
+
+      - name: Reflect Pickled verdict
+        if: always()
+        run: |
+          question_status="${{ steps.questions.outputs.exit_code }}"
+          build_status="${{ steps.builds.outputs.exit_code }}"
+          if [ "${question_status:-0}" -ne 0 ]; then
+            exit "$question_status"
+          fi
+          if [ "${build_status:-0}" -ne 0 ]; then
+            exit "$build_status"
+          fi
