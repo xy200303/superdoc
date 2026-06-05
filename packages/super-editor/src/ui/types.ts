@@ -114,7 +114,7 @@ export type ZoomMode = 'manual' | 'fit-width';
 export interface ZoomViewportMetrics {
   /** Width available to the document in pixels (container minus the comments sidebar). */
   availableWidth: number;
-  /** Document base page width in pixels at 100% zoom. */
+  /** Widest document page width in pixels at 100% zoom. */
   documentWidth: number;
   /** Unclamped zoom percentage that fits the document in the available width. */
   fitZoom: number;

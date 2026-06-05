@@ -466,7 +466,7 @@ superdoc.on('zoomChange', ({ zoom, mode }) => {
 
 ### `viewport-change`
 
-When the implied fit changes: the rounded `fitZoom` or the document's base page width (container resize, comments sidebar toggle, page orientation). Pixel-level width movement that cannot change any fit decision is deduped; `getViewportMetrics()` always reads the latest measurements. The payload carries pure measurements; `zoom.fitWidth` policy options never affect them:
+When the fit-width calculation changes. Pixel-level width changes that do not affect the rounded fit are deduped. `getViewportMetrics()` always reads the latest measurements.
 
 - `availableWidth` - container width in pixels, minus the comments sidebar when visible
 - `documentWidth` - the widest document page width in pixels at 100% zoom (zoom-independent; DOCX from laid-out pages with page-styles fallback, PDF from rendered pages)
@@ -474,7 +474,7 @@ When the implied fit changes: the rounded `fitZoom` or the document's base page 
 
 HTML documents reflow to the container, so an HTML-only instance reports no metrics.
 
-The same values are readable at any time via `getViewportMetrics()`. For the common case, prefer [`zoom.mode: 'fit-width'`](/editor/superdoc/configuration#param-zoom), which clamps and applies the fit automatically. Subscribe to this event (or pass the `onViewportChange` config callback, which is registered before the first emit) only when you want to decide the zoom yourself.
+For most use cases, prefer [`zoom.mode: 'fit-width'`](/editor/superdoc/configuration#param-zoom). Subscribe to this event only when you want to apply custom zoom behavior.
 
 <CodeGroup>
 ```javascript Usage

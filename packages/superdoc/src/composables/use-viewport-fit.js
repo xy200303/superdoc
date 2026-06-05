@@ -77,16 +77,11 @@ export const normalizePdfPageMeasurement = (measured, scaleFactor, zoomFactor) =
  * available/document ratio. The fit policy (and only the policy) accounts
  * for `config.zoom.fitWidth` padding and clamping.
  *
- * The base page width is re-resolved on every evaluation (never latched)
- * and is the widest measurable page across all loaded documents: DOCX
- * widths come from the widest laid-out page (editor.getPages(), the same
- * source the renderer's container sizing uses) with body page styles as
- * the pre-pagination fallback - both zoom-independent, so a zoom applied
- * before the first measurement cannot corrupt the ratio - and PDF widths
- * from rendered pages normalized by their actual scale factor. HTML documents
- * reflow and contribute nothing; an HTML-only instance reports no
- * metrics. A zoom-normalized DOM measurement is the last-resort fallback
- * for a DOCX editor without page styles.
+ * The base page width is re-resolved on every evaluation (never latched):
+ * DOCX uses the widest laid-out page with page-styles fallback, PDF uses
+ * rendered pages normalized by their actual scale factor, and HTML reflows
+ * so it contributes no fixed width. A zoom-normalized DOM measurement is
+ * the last-resort fallback for a DOCX editor without page geometry.
  *
  * The fit application writes the zoom state directly instead of calling
  * `setZoom()`, which by contract switches the mode to `manual`.

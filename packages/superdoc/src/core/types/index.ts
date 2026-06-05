@@ -1742,7 +1742,7 @@ export interface SuperDocViewportChangePayload {
    * width minus the comments sidebar when it is visible.
    */
   availableWidth: number;
-  /** Widest document page width in pixels at 100% zoom (zoom-independent; DOCX from laid-out pages with page-styles fallback, PDF from rendered pages). */
+  /** Widest document page width in pixels at 100% zoom. */
   documentWidth: number;
   /** Zoom percentage that fits the document in the available width (unclamped, padding-free). Clamp before applying. */
   fitZoom: number;
@@ -1960,7 +1960,7 @@ export interface Config {
   onListDefinitionsChange?: (params: ListDefinitionsPayload) => void;
   /**
    * Callback when the zoom level changes. Fires for every zoom source:
-   * `setZoom()`, the toolbar zoom control, and fit-to-container
+   * `setZoom()`, the toolbar zoom control, and fit-width
    * adjustments.
    */
   onZoomChange?: (params: SuperDocZoomPayload) => void;
@@ -1968,8 +1968,7 @@ export interface Config {
    * Callback when the implied fit changes (rounded fit zoom or base
    * page width); pixel-level width jitter does not fire it, and
    * `getViewportMetrics()` always reads latest. Registered before the
-   * first emit, so the initial viewport measurement is never missed
-   * (unlike subscribing inside `onReady`).
+   * first emit.
    */
   onViewportChange?: (params: SuperDocViewportChangePayload) => void;
   /** The format of the document (docx, pdf, html). */
@@ -2053,8 +2052,8 @@ export interface Config {
    */
   useLayoutEngine?: boolean;
   /**
-   * Zoom behavior: the initial zoom level and the optional automatic
-   * fit-to-container policy. See `SuperDocZoomConfig`.
+   * Zoom behavior: the initial zoom level and optional fit-width
+   * policy. See `SuperDocZoomConfig`.
    */
   zoom?: SuperDocZoomConfig;
   /**

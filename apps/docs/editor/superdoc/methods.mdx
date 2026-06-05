@@ -538,7 +538,7 @@ const superdoc = new SuperDoc({
 
 ### `setZoom`
 
-Set the zoom level for all documents and switch the zoom mode to `manual`. Propagates to all presentation editors, PDF viewers, and whiteboard layers. Use `setZoomMode('fit-width')` to re-enter automatic fitting.
+Set an explicit zoom level and switch zoom mode to `manual`. Use `setZoomMode('fit-width')` to turn automatic fitting back on.
 
 <ParamField path="percent" type="number" required>
   Zoom level as a percentage (e.g., `100`, `150`, `200`). Must be a positive finite number.
@@ -571,7 +571,7 @@ const superdoc = new SuperDoc({
 
 ### `setZoomMode`
 
-Switch the zoom mode. `'fit-width'` continuously re-fits the document to the available container width, clamped by [`zoom.fitWidth`](/editor/superdoc/configuration#param-zoom); `'manual'` holds the current value. Switching to `'fit-width'` applies the fit immediately when viewport metrics are available. Emits `zoomChange` (with the current value) so zoom UIs observe mode-only transitions; calling with the current mode is a no-op. Works for DOCX and PDF documents.
+Switch between manual zoom and automatic fit-width zoom. `'fit-width'` keeps DOCX and PDF documents fitted to the available container width, using the bounds from [`zoom.fitWidth`](/editor/superdoc/configuration#param-zoom). Calling `setZoom()` switches back to `'manual'`.
 
 <ParamField path="mode" type="'manual' | 'fit-width'" required>
   The zoom mode to switch to.
@@ -604,7 +604,7 @@ const superdoc = new SuperDoc({
 
 ### `getZoomState`
 
-Get a snapshot of the current zoom state: mode, value, the latest computed fit zoom, and the effective fit bounds.
+Get the current zoom mode, value, latest fit calculation, and effective fit bounds.
 
 **Returns:** `SuperDocZoomState` - `{ mode, value, fitZoom, min, max }`. `fitZoom` is `null` before the first viewport measurement.
 
@@ -632,7 +632,7 @@ const superdoc = new SuperDoc({
 
 ### `getViewportMetrics`
 
-Get the latest viewport measurements: the width available to the document, the document's base page width at 100% zoom, and the unclamped fit zoom. Subscribe to [`viewport-change`](/editor/superdoc/events#viewport-change) for updates.
+Get the latest fit-width measurements. Use this when you need custom zoom behavior instead of `zoom.mode: 'fit-width'`.
 
 **Returns:** `SuperDocViewportMetrics | null` - `{ availableWidth, documentWidth, fitZoom }`, or `null` until the first measurement (editors still mounting).
 

@@ -562,17 +562,17 @@ new SuperDoc({
 </ParamField>
 
 <ParamField path="zoom" type="Object">
-  Zoom behavior: the initial zoom level, the starting mode, and the fit-width policy bounds. The zoom system is "mode + value": `manual` holds whatever was last set, `fit-width` continuously re-fits the document to the available container width. Runtime control stays on the instance: `setZoom()` (switches to manual), `setZoomMode()`, `getZoomState()`, `getViewportMetrics()`, and the `zoomChange` / `viewport-change` events.
+  Zoom behavior for the document. Use `mode: 'fit-width'` to keep DOCX and PDF documents fitted to the available container width. Calling `setZoom()` switches back to manual zoom.
 
   <Expandable title="properties" defaultOpen>
     <ParamField path="zoom.initial" type="number" default="100">
-      Initial zoom level as a percentage. Applied before the first paint, so the document renders directly at this zoom with no visible jump. In `fit-width` mode this is the paint zoom until the first fit computes.
+      Initial zoom level as a percentage. In `fit-width` mode, this is the paint zoom until the first fit computes.
     </ParamField>
     <ParamField path="zoom.mode" type="'manual' | 'fit-width'" default="'manual'">
-      Starting zoom mode. In `'fit-width'` the document re-fits whenever the container resizes or the page geometry changes; the fit is applied through the normal zoom pipeline, so `zoomChange` fires for every adjustment. Calling `setZoom()` switches back to `'manual'`.
+      Starting zoom mode. `'manual'` holds the current value. `'fit-width'` keeps the document fitted to the container.
     </ParamField>
     <ParamField path="zoom.fitWidth" type="Object">
-      Bounds and padding for the `fit-width` policy. These shape the applied zoom only; the metrics reported by `viewport-change` and `getViewportMetrics()` stay pure measurements.
+      Bounds and padding for the applied fit-width zoom.
       <Expandable title="properties">
         <ParamField path="zoom.fitWidth.min" type="number" default="10">
           Lower bound for the applied zoom percentage.
@@ -587,7 +587,7 @@ new SuperDoc({
     </ParamField>
   </Expandable>
 
-  For custom behavior instead of the built-in policy, subscribe to the [`viewport-change`](/editor/superdoc/events#viewport-change) event and apply your own zoom.
+  For custom behavior, listen to [`viewport-change`](/editor/superdoc/events#viewport-change) and call `setZoom()` yourself.
 
   <CodeGroup>
 
@@ -747,7 +747,7 @@ All handlers are optional functions in the configuration:
 </ParamField>
 
 <ParamField path="onZoomChange" type="function">
-  Called when the zoom level changes, from any source: `setZoom()`, the toolbar zoom control, or `fit-width` mode
+  Called when zoom changes from `setZoom()`, the toolbar zoom control, or `fit-width` mode.
 
   ```javascript
   onZoomChange: ({ zoom, mode }) => {
@@ -757,11 +757,11 @@ All handlers are optional functions in the configuration:
 </ParamField>
 
 <ParamField path="onViewportChange" type="function">
-  Called when the implied fit changes (rounded fit zoom or base page width); pixel-level width jitter is deduped and `getViewportMetrics()` always reads latest. Registered before the first emit, so the initial measurement is never missed. See the [`viewport-change`](/editor/superdoc/events#viewport-change) event.
+  Called when the fit-width calculation changes. Pixel-level width jitter is deduped. `getViewportMetrics()` always reads the latest measurements.
 
   ```javascript
   onViewportChange: ({ availableWidth, documentWidth, fitZoom }) => {
-    superdoc.setZoom(Math.min(100, fitZoom));
+    updateFitIndicator({ availableWidth, documentWidth, fitZoom });
   }
   ```
 </ParamField>
