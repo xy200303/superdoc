@@ -30,6 +30,10 @@ class FakeRegistry {
     return [];
   }
 
+  hasFace(family: string, weight: '400' | '700', style: 'normal' | 'italic'): boolean {
+    return this.#sources.has(`${family.toLowerCase()}|${weight}|${style}`);
+  }
+
   asRegistry(): FontRegistry {
     return this as unknown as FontRegistry;
   }
@@ -206,10 +210,26 @@ describe('DocumentFontController', () => {
   it('preload resolves logical families through the document resolver', async () => {
     const { controller, registry } = makeController();
 
-    controller.applyInitialConfig({ map: { Georgia: 'Gelasio' } });
+    // Register Gelasio (so the map target is loadable), then map Georgia -> Gelasio.
+    controller.applyInitialConfig({
+      families: [{ family: 'Gelasio', faces: [{ source: '/fonts/Gelasio-Regular.woff2' }] }],
+      map: { Georgia: 'Gelasio' },
+    });
     await controller.preload(['Georgia']);
 
     expect(registry.awaited).toEqual([[{ family: 'Gelasio', weight: '400', style: 'normal' }]]);
+  });
+
+  it('preload prefers a registered real face over the bundled substitute (provider precedence)', async () => {
+    const { controller, registry } = makeController();
+
+    // The document registered real Calibri faces; preload must load Calibri, NOT the bundled Carlito.
+    controller.applyInitialConfig({
+      families: [{ family: 'Calibri', faces: [{ source: '/fonts/Calibri.woff2' }] }],
+    });
+    await controller.preload(['Calibri']);
+
+    expect(registry.awaited).toEqual([[{ family: 'Calibri', weight: '400', style: 'normal' }]]);
   });
 
   it('still reflows for faces committed before a later conflicting face throws', () => {
@@ -254,33 +274,48 @@ describe('DocumentFontController', () => {
     await expect(controller.preload('Georgia' as never)).rejects.toThrow(/expects an array/);
   });
 
-  it('does not reflow when mapping a family to the substitute it already resolves to', () => {
+  it('does not reflow on a redundant identity map (a true no-op stays cache-shareable)', () => {
     const { controller, resolver, notifyDocumentFontConfigChanged, flushMicrotasks } = makeController();
 
-    // Calibri already resolves to Carlito via the bundled map, so this map is a true no-op:
-    // it must not record an override (which would move the signature and de-opt cache sharing).
-    controller.map({ Calibri: 'Carlito' });
+    // Mapping a family to its OWN name is the absence of an override: no reflow, signature stays ''.
+    controller.map({ Georgia: 'Georgia' });
     flushMicrotasks();
 
-    expect(resolver.resolvePrimaryPhysicalFamily('Calibri')).toBe('Carlito');
     expect(resolver.signature).toBe('');
     expect(notifyDocumentFontConfigChanged).not.toHaveBeenCalled();
   });
 
-  it('mapping a previously-mapped family back to its default reflows once and restores shared cache', () => {
+  it('mapping a family to the bundled clone now stores an explicit pin (reflows; not a silent no-op)', () => {
+    const { controller, resolver, notifyDocumentFontConfigChanged, flushMicrotasks } = makeController();
+
+    // After provider precedence, map({ Calibri: 'Carlito' }) is an explicit pin to the clone, not a
+    // no-op: it stores a custom_mapping override (so it beats a registered real Calibri) and reflows.
+    controller.map({ Calibri: 'Carlito' });
+    flushMicrotasks();
+
+    expect(resolver.resolvePrimaryPhysicalFamily('Calibri')).toBe('Carlito');
+    expect(resolver.signature).not.toBe('');
+    expect(notifyDocumentFontConfigChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('unmap reverts a pin (mapping to the clone re-pins rather than reverting)', () => {
     const { controller, resolver, notifyDocumentFontConfigChanged, flushMicrotasks } = makeController();
 
     controller.map({ Calibri: 'Tinos' });
     flushMicrotasks();
-    expect(resolver.signature).not.toBe('');
     expect(notifyDocumentFontConfigChanged).toHaveBeenCalledTimes(1);
 
-    // Mapping back to the bundled default removes the override (resolution changes Tinos -> Carlito),
-    // so it reflows once more AND returns the signature to '' so this document re-shares caches.
+    // Mapping to the clone now RE-PINS (stores Calibri -> Carlito), it does not revert.
     controller.map({ Calibri: 'Carlito' });
     flushMicrotasks();
     expect(resolver.resolvePrimaryPhysicalFamily('Calibri')).toBe('Carlito');
-    expect(resolver.signature).toBe('');
+    expect(resolver.signature).not.toBe(''); // still pinned
     expect(notifyDocumentFontConfigChanged).toHaveBeenCalledTimes(2);
+
+    // unmap is the revert: back to the shared default.
+    controller.unmap('Calibri');
+    flushMicrotasks();
+    expect(resolver.signature).toBe('');
+    expect(notifyDocumentFontConfigChanged).toHaveBeenCalledTimes(3);
   });
 });

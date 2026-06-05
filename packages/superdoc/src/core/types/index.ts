@@ -116,10 +116,13 @@ export interface SuperDocFontsApi {
   /**
    * Map logical families to physical render families for the ACTIVE document, overriding bundled
    * defaults: `map({ Georgia: 'Gelasio', Arial: 'Liberation Sans' })`. Applies all entries, then
-   * re-measures and repaints once (a no-op map does neither); observe via {@link onReport} /
-   * `fonts-changed` (`source: 'config-change'`). Each physical family must be loadable - a bundled
-   * substitute, or a face added via `add`. Per document: other editors on the page are unaffected.
-   * Render-only - export keeps the logical family name.
+   * re-measures and repaints once (a redundant map - a self-map, or a mapping identical to an
+   * already-stored override - does neither); observe via {@link onReport} / `fonts-changed` (`source:
+   * 'config-change'`). Mapping a family to its bundled clone (`map({ Calibri: 'Carlito' })`) is honored
+   * as an explicit PIN - stored so it outranks a registered real face for that family - not treated as
+   * a no-op. Each physical family must be loadable - a bundled substitute, or a face added via `add`.
+   * Per document: other editors on the page are unaffected. Render-only - export keeps the logical
+   * family name.
    * @throws Error if no editor is active (a write needs a document; this fails loudly, not silently).
    */
   map(mappings: Record<string, string>): void;

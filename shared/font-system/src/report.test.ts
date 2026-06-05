@@ -107,6 +107,14 @@ class FaceRegistry {
     this.registered.add(this.#key(family, weight, style));
     this.faceStatuses.set(this.#key(family, weight, style), status);
   }
+  setAwaitedFaceStatus(
+    family: string,
+    weight: '400' | '700',
+    style: 'normal' | 'italic',
+    status: FontLoadStatus,
+  ): void {
+    this.faceStatuses.set(this.#key(family, weight, style), status);
+  }
   asRegistry(): FontRegistry {
     return this as unknown as FontRegistry;
   }
@@ -120,7 +128,7 @@ describe('buildFaceReport (face-level)', () => {
     // unregistered family can never report `loaded` (document.fonts.load resolves only registered
     // faces, not system fonts), so in production it settles to `fallback_used` - model that, not the
     // prior unrealistic `unloaded`.
-    reg.setFace('Georgia', '700', 'normal', 'fallback_used');
+    reg.setAwaitedFaceStatus('Georgia', '700', 'normal', 'fallback_used');
     const resolver = createFontResolver();
     resolver.map('Georgia', 'Gelasio');
     const rows = buildFaceReport(
@@ -150,6 +158,40 @@ describe('buildFaceReport (face-level)', () => {
         // Bold is NOT faithfully substituted (Gelasio has no Bold), so the family passes through and
         // the face is missing - deterministically, by reason. getMissingFonts() will list Georgia.
         missing: true,
+        face: { weight: '700', style: 'normal' },
+      },
+    ]);
+  });
+
+  it('a registered real face for the logical family reports registered_face, not the bundled substitute', () => {
+    const reg = new FaceRegistry();
+    // A document/customer registered real Calibri faces (vs the bundled Carlito clone).
+    reg.setFace('Calibri', '400', 'normal', 'loaded');
+    reg.setFace('Calibri', '700', 'normal', 'loaded');
+    const rows = buildFaceReport(
+      [
+        { logicalFamily: 'Calibri', weight: '400', style: 'normal' },
+        { logicalFamily: 'Calibri', weight: '700', style: 'normal' },
+      ],
+      reg.asRegistry(),
+    );
+    expect(rows).toEqual([
+      {
+        logicalFamily: 'Calibri',
+        physicalFamily: 'Calibri', // the real family, not Carlito
+        reason: 'registered_face',
+        loadStatus: 'loaded',
+        exportFamily: 'Calibri',
+        missing: false,
+        face: { weight: '400', style: 'normal' },
+      },
+      {
+        logicalFamily: 'Calibri',
+        physicalFamily: 'Calibri',
+        reason: 'registered_face',
+        loadStatus: 'loaded',
+        exportFamily: 'Calibri',
+        missing: false,
         face: { weight: '700', style: 'normal' },
       },
     ]);

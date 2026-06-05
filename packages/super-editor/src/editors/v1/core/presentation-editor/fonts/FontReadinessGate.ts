@@ -135,6 +135,9 @@ export class FontReadinessGate {
   readonly #seenAvailable = new Set<string>();
   /** Face keys observed available, so the face-path late-load handler fires once per face. */
   readonly #seenAvailableFaces = new Set<string>();
+  /** Face keys observed terminally FAILED, so the failure-demotion replan fires at most once per face
+   *  (and cannot loop when the bundled clone it steps down to also fails). */
+  readonly #seenFailedFaces = new Set<string>();
   #lastSummary: FontLoadSummary | null = null;
   #loadingDoneHandler: ((event: FontFaceSetLoadEvent) => void) | null = null;
   /** Batches late-load reflows so many font arrivals coalesce into bounded re-measures. */
@@ -256,11 +259,22 @@ export class FontReadinessGate {
       results = [];
     }
 
+    const failedKeys: string[] = [];
     for (const result of results) {
+      const key = faceKeyOf(result.request.family, result.request.weight, result.request.style);
       if (result.status === 'loaded') {
-        this.#seenAvailableFaces.add(faceKeyOf(result.request.family, result.request.weight, result.request.style));
+        this.#seenAvailableFaces.add(key);
+      } else if (result.status === 'failed' && !this.#seenFailedFaces.has(key)) {
+        // A registered provider face whose asset terminally FAILED to load. `registry.hasFace` now
+        // demotes it, so a replan re-resolves these runs to the bundled metric clone instead of leaving
+        // the document on a broken registered face for the session. Fire once per face (seenFailed) so
+        // it cannot loop if the clone it steps down to also fails. NOT done for `timed_out` - a slow
+        // face is recovered by the late-load reflow, and demoting it would strand the real font.
+        this.#seenFailedFaces.add(key);
+        failedKeys.push(key);
       }
     }
+    if (failedKeys.length > 0) this.#scheduleAvailabilityReflow(failedKeys);
     this.#lastSummary = summarizeFaces(results);
     return this.#lastSummary;
   }
@@ -377,6 +391,7 @@ export class FontReadinessGate {
     this.#requiredFamilies = new Set();
     this.#seenAvailable.clear();
     this.#seenAvailableFaces.clear();
+    this.#seenFailedFaces.clear();
     this.#lastSummary = null;
   }
 
@@ -469,11 +484,18 @@ export class FontReadinessGate {
     }
 
     if (changedKeys.length === 0) return;
-    // The available-font picture changed NOW, so bump the epoch and clear the measurement
-    // caches immediately - measure caches are keyed without the epoch (fontMetricsCache is
-    // `family|size|bold|italic`), so this explicit clear is the only thing that busts them,
-    // and any re-measure/paint before the batched reflow must already see the loaded font.
-    // Only the expensive full reflow is deferred to the scheduler so arrival waves coalesce.
+    this.#scheduleAvailabilityReflow(changedKeys);
+  }
+
+  /**
+   * The available-font picture changed (a required face loaded LATE, or a registered face terminally
+   * FAILED so it must demote to the bundled clone). Bump the epoch and clear the measurement caches
+   * immediately - measure caches are keyed without the epoch (`family|size|bold|italic`), so this
+   * explicit clear is the only thing that busts them, and any re-measure/paint before the batched
+   * reflow must already see the corrected resolution. Only the expensive full reflow is deferred to the
+   * scheduler so arrival/failure waves coalesce.
+   */
+  #scheduleAvailabilityReflow(changedKeys: string[]): void {
     this.#fontConfigVersion += 1;
     bumpFontConfigVersion(); // bump the global epoch so paint reuse signatures bust
     this.#invalidateCaches();
