@@ -21,6 +21,7 @@ export type PageStyles = {
   background?: string;
   boxShadow?: string;
   border?: string;
+  color?: string;
   margin?: string;
 };
 
@@ -28,6 +29,7 @@ export const DEFAULT_PAGE_STYLES: Required<PageStyles> = {
   background: 'var(--sd-layout-page-bg, #fff)',
   boxShadow: 'var(--sd-layout-page-shadow, 0 4px 20px rgba(15, 23, 42, 0.08))',
   border: '1px solid rgba(15, 23, 42, 0.08)',
+  color: 'var(--sd-layout-page-color, #000)',
   margin: '0 auto',
 };
 
@@ -77,6 +79,7 @@ export const pageStyles = (width: number, height: number, overrides?: PageStyles
     background: merged.background,
     boxShadow: merged.boxShadow,
     border: merged.border,
+    color: merged.color,
     margin: merged.margin,
     overflow: 'hidden',
   };

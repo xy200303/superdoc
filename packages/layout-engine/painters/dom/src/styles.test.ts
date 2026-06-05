@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ensureSdtContainerStyles, ensureTrackChangeStyles, lineStyles } from './styles.js';
+import { ensureSdtContainerStyles, ensureTrackChangeStyles, lineStyles, pageStyles } from './styles.js';
 
 describe('lineStyles', () => {
   it('sets height and lineHeight from the argument', () => {
@@ -11,6 +11,20 @@ describe('lineStyles', () => {
   it('sets fontSize to 0 to eliminate the CSS strut', () => {
     const styles = lineStyles(20);
     expect(styles.fontSize).toBe('0');
+  });
+});
+
+describe('pageStyles', () => {
+  it('sets a black default text color for document content inheritance', () => {
+    const styles = pageStyles(400, 500);
+
+    expect(styles.color).toBe('var(--sd-layout-page-color, #000)');
+  });
+
+  it('allows consumers to override the page text color token', () => {
+    const styles = pageStyles(400, 500, { color: '#333333' });
+
+    expect(styles.color).toBe('#333333');
   });
 });
 
