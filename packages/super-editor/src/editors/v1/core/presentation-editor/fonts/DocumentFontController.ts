@@ -190,8 +190,13 @@ export class DocumentFontController {
     }
     const registry = this.#getGate()?.resolveRegistry();
     if (!registry) throw new Error('[superdoc] fonts.preload: the font registry is not ready yet');
+    // Resolve the regular face through the provider-precedence ladder, not the family-level bundled
+    // map: if the document registered a real face for this family, preload THAT, not the clone.
+    const hasFace = (family: string, weight: '400' | '700', style: 'normal' | 'italic'): boolean =>
+      registry.hasFace(family, weight, style);
+    const face = { weight: '400', style: 'normal' } as const;
     const requests: FontFaceRequest[] = families.map((logical) => ({
-      family: this.#resolver.resolvePrimaryPhysicalFamily(logical),
+      family: this.#resolver.resolveFace(logical, face, hasFace).physicalFamily,
       weight: '400',
       style: 'normal',
     }));

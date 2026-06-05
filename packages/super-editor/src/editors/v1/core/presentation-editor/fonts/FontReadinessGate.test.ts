@@ -400,6 +400,26 @@ describe('FontReadinessGate', () => {
       expect(summary.results).toEqual([{ family: 'Carlito', status: 'failed' }]);
     });
 
+    it('replans once when a required face terminally FAILS, so it can demote to the clone (Fix 2b)', async () => {
+      registry.faceStatuses.set(faceKey(BOLD), 'failed');
+      const gate = makeFaceGate(() => [BOLD]);
+
+      await gate.ensureReadyForMeasure();
+      // The failed required face triggers a demotion replan: caches invalidated synchronously, the
+      // (batched) reflow flushes after the scheduler window. The next render re-resolves to the clone.
+      expect(invalidateCaches).toHaveBeenCalledTimes(1);
+      expect(requestReflow).not.toHaveBeenCalled();
+      clock.advance(300);
+      expect(requestReflow).toHaveBeenCalledTimes(1);
+
+      // A second measure pass with the SAME face still failed must NOT replan again - fire-once, so it
+      // cannot loop when the bundled clone it steps down to also fails. Drain the full cooldown.
+      await gate.ensureReadyForMeasure();
+      clock.advance(2500);
+      expect(invalidateCaches).toHaveBeenCalledTimes(1);
+      expect(requestReflow).toHaveBeenCalledTimes(1);
+    });
+
     it('reflows once when the required bold face loads after a timed-out first paint', async () => {
       registry.faceStatuses.set(faceKey(BOLD), 'timed_out');
       const gate = makeFaceGate(() => [BOLD]);

@@ -35,6 +35,7 @@ import {
   buildLayoutSourceIdentityForFragment,
   normalizeColumnLayout,
   getFragmentZIndex,
+  resolveAnchoredGraphicY,
   resolveEffectiveHeaderFooterRef,
   selectHeaderFooterVariantForPage,
 } from '@superdoc/contracts';
@@ -1952,86 +1953,32 @@ export function layoutDocument(blocks: FlowBlock[], measures: Measure[], options
   const resolveParagraphlessAnchoredTableY = (block: TableBlock, measure: TableMeasure, state: PageState): number => {
     const contentTop = state.topMargin;
     const contentBottom = state.contentBottom;
-    const contentHeight = Math.max(0, contentBottom - contentTop);
     const tableHeight = measure.totalHeight ?? 0;
-    const anchor = block.anchor;
-    const offsetV = anchor?.offsetV ?? 0;
-    const vRelativeFrom = anchor?.vRelativeFrom;
-    const alignV = anchor?.alignV;
 
-    if (vRelativeFrom === 'margin') {
-      if (alignV === 'bottom') {
-        return contentBottom - tableHeight + offsetV;
-      }
-      if (alignV === 'center') {
-        return contentTop + (contentHeight - tableHeight) / 2 + offsetV;
-      }
-      return contentTop + offsetV;
-    }
-
-    if (vRelativeFrom === 'page') {
-      if (alignV === 'bottom') {
-        const pageHeight = contentBottom + (state.page.margins?.bottom ?? activeBottomMargin);
-        return pageHeight - tableHeight + offsetV;
-      }
-      if (alignV === 'center') {
-        const pageHeight = contentBottom + (state.page.margins?.bottom ?? activeBottomMargin);
-        return (pageHeight - tableHeight) / 2 + offsetV;
-      }
-      return offsetV;
-    }
-
-    // Paragraph-relative floating tables normally anchor to a body paragraph.
-    // When a document has no body paragraphs at all, fall back to the top of the
-    // content area so the table can still render on page 1.
-    return contentTop + offsetV;
+    return resolveAnchoredGraphicY({
+      anchor: block.anchor as Parameters<typeof resolveAnchoredGraphicY>[0]['anchor'],
+      objectHeight: tableHeight,
+      contentTop,
+      contentBottom,
+      pageBottomMargin: state.page.margins?.bottom ?? activeBottomMargin,
+      preRegisteredFallbackToContentTop: true,
+    });
   };
 
   for (const entry of preRegisteredAnchors) {
     // Ensure first page exists
     const state = paginator.ensurePage();
 
-    // Calculate anchor Y position based on vRelativeFrom and alignV
-    const vRelativeFrom = entry.block.anchor?.vRelativeFrom ?? 'paragraph';
-    const alignV = entry.block.anchor?.alignV ?? 'top';
-    const offsetV = entry.block.anchor?.offsetV ?? 0;
-    const imageHeight = entry.measure.height ?? 0;
-
-    // Calculate the content area boundaries
     const contentTop = state.topMargin;
     const contentBottom = state.contentBottom;
-    const contentHeight = Math.max(0, contentBottom - contentTop);
-
-    let anchorY: number;
-
-    if (vRelativeFrom === 'margin') {
-      // Position relative to the content area (margin box)
-      if (alignV === 'top') {
-        anchorY = contentTop + offsetV;
-      } else if (alignV === 'bottom') {
-        anchorY = contentBottom - imageHeight + offsetV;
-      } else if (alignV === 'center') {
-        anchorY = contentTop + (contentHeight - imageHeight) / 2 + offsetV;
-      } else {
-        anchorY = contentTop + offsetV;
-      }
-    } else if (vRelativeFrom === 'page') {
-      // Position relative to the physical page (0 = top edge)
-      if (alignV === 'top') {
-        anchorY = offsetV;
-      } else if (alignV === 'bottom') {
-        const pageHeight = contentBottom + (state.page.margins?.bottom ?? activeBottomMargin);
-        anchorY = pageHeight - imageHeight + offsetV;
-      } else if (alignV === 'center') {
-        const pageHeight = contentBottom + (state.page.margins?.bottom ?? activeBottomMargin);
-        anchorY = (pageHeight - imageHeight) / 2 + offsetV;
-      } else {
-        anchorY = offsetV;
-      }
-    } else {
-      // Shouldn't happen for pre-registered anchors, but fallback
-      anchorY = contentTop + offsetV;
-    }
+    const anchorY = resolveAnchoredGraphicY({
+      anchor: entry.block.anchor,
+      objectHeight: entry.measure.height ?? 0,
+      contentTop,
+      contentBottom,
+      pageBottomMargin: state.page.margins?.bottom ?? activeBottomMargin,
+      preRegisteredFallbackToContentTop: true,
+    });
 
     // Compute anchor X position
     const anchorX = entry.block.anchor
@@ -2579,10 +2526,6 @@ export function layoutDocument(blocks: FlowBlock[], measures: Measure[], options
         }
       }
 
-      // Paragraph start Y (OOXML: anchor for vertAnchor="text"). Captured before layout so
-      // paragraph-anchored tables use it as base; offsetV (tblpY) positions below start to avoid overlap.
-      const paragraphStartY = paginator.ensurePage().cursorY;
-
       layoutParagraphBlock(
         {
           block,
@@ -2622,16 +2565,26 @@ export function layoutDocument(blocks: FlowBlock[], measures: Measure[], options
       if (tablesForPara) {
         const state = paginator.ensurePage();
         const columnWidthForTable = getCurrentColumnWidth();
+
+        // Paragraph top after layout (first fragment on this page). Pre-layout cursorY can still
+        // sit on the previous page when the anchor paragraph breaks across pages.
+        let anchorParagraphTopY = state.cursorY;
+        for (const fragment of state.page.fragments) {
+          if (fragment.kind === 'para' && fragment.blockId === block.id) {
+            anchorParagraphTopY = Math.min(anchorParagraphTopY, fragment.y);
+          }
+        }
+
         let tableBottomY = state.cursorY;
+        let nextStackY = state.cursorY;
         for (const { block: tableBlock, measure: tableMeasure } of tablesForPara) {
           if (placedAnchoredTableIds.has(tableBlock.id)) continue;
           const totalWidth = tableMeasure.totalWidth ?? 0;
           if (columnWidthForTable > 0 && totalWidth >= columnWidthForTable * ANCHORED_TABLE_FULL_WIDTH_RATIO) continue;
 
-          // OOXML anchor base is paragraph-relative. Clamp to paragraph bottom so the table never overlaps
-          // paragraph text, then apply offsetV from that resolved anchor position.
+          // OOXML anchor base is paragraph-relative. Clamp below laid-out paragraph text, then offsetV.
           const offsetV = tableBlock.anchor?.offsetV ?? 0;
-          const anchorBaseY = Math.max(paragraphStartY, state.cursorY);
+          const anchorBaseY = Math.max(anchorParagraphTopY, nextStackY);
           const anchorY = anchorBaseY + offsetV;
           floatManager.registerTable(tableBlock, tableMeasure, anchorY, state.columnIndex, state.page.number);
 
@@ -2646,7 +2599,9 @@ export function layoutDocument(blocks: FlowBlock[], measures: Measure[], options
           const wrapType = tableBlock.wrap?.type ?? 'None';
           if (wrapType !== 'None') {
             const bottom = anchorY + (tableMeasure.totalHeight ?? 0);
+            const distBottom = tableBlock.wrap?.distBottom ?? 0;
             if (bottom > tableBottomY) tableBottomY = bottom;
+            nextStackY = bottom + distBottom;
           }
         }
         state.cursorY = tableBottomY;
