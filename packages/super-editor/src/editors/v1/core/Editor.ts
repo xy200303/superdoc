@@ -1095,6 +1095,9 @@ export class Editor extends EventEmitter<EditorEventMap> {
     this.on('comment-positions', this.options.onCommentLocationsUpdate!);
     this.on('list-definitions-change', this.options.onListDefinitionsChange!);
     this.on('fonts-resolved', this.options.onFontsResolved!);
+    // Emitted unconditionally by PresentationEditor, so only register a real callback -
+    // a bare `this.on('fonts-changed', undefined)` would make `emit` call undefined.
+    if (this.options.onFontsChanged) this.on('fonts-changed', this.options.onFontsChanged);
     this.on('exception', this.options.onException!);
     this.on('pointerDown', this.options.onPointerDown!);
     this.#trackContentControlPointer();
@@ -1527,6 +1530,9 @@ export class Editor extends EventEmitter<EditorEventMap> {
     this.on('comment-positions', this.options.onCommentLocationsUpdate!);
     this.on('list-definitions-change', this.options.onListDefinitionsChange!);
     this.on('fonts-resolved', this.options.onFontsResolved!);
+    // Emitted unconditionally by PresentationEditor, so only register a real callback -
+    // a bare `this.on('fonts-changed', undefined)` would make `emit` call undefined.
+    if (this.options.onFontsChanged) this.on('fonts-changed', this.options.onFontsChanged);
     this.on('exception', this.options.onException!);
     this.on('pointerDown', this.options.onPointerDown!);
     this.#trackContentControlPointer();
@@ -3269,7 +3275,6 @@ export class Editor extends EventEmitter<EditorEventMap> {
     }
   }
 
-
   #collectActiveSdtRefs(selection: EditorState['selection']): SdtRef[] {
     const refs: SdtRef[] = [];
     const seenIds = new Set<string>();
@@ -3977,6 +3982,31 @@ export class Editor extends EventEmitter<EditorEventMap> {
       for (const path of Object.keys(this.converter.convertedXml)) {
         if (!path.startsWith('customXml/')) continue;
         if (!path.endsWith('.xml') && !path.endsWith('.rels')) continue;
+        if (Object.prototype.hasOwnProperty.call(updatedDocs, path)) continue;
+        const partData = this.converter.convertedXml[path] as { elements?: unknown[] } | undefined;
+        if (partData?.elements?.[0]) {
+          updatedDocs[path] = String(this.converter.schemaToXml(partData.elements[0]));
+        }
+      }
+
+      // templates.apply: serialize substrate parts copied from a source package
+      // (theme, fontTable, webSettings) so they survive save/export. These parts
+      // have no dedicated serialization above; mirror the customXml passthrough.
+      // Also re-serialize [Content_Types].xml and word/_rels/document.xml.rels
+      // from convertedXml when the adapter added Overrides/Relationships there,
+      // so the copied parts are registered in the package.
+      const templateSubstratePaths = Object.keys(this.converter.convertedXml).filter(
+        (path) =>
+          /^word\/theme\/[^/]+\.xml$/.test(path) || path === 'word/fontTable.xml' || path === 'word/webSettings.xml',
+      );
+      for (const path of templateSubstratePaths) {
+        if (Object.prototype.hasOwnProperty.call(updatedDocs, path)) continue;
+        const partData = this.converter.convertedXml[path] as { elements?: unknown[] } | undefined;
+        if (partData?.elements?.[0]) {
+          updatedDocs[path] = String(this.converter.schemaToXml(partData.elements[0]));
+        }
+      }
+      for (const path of ['[Content_Types].xml', 'word/_rels/document.xml.rels']) {
         if (Object.prototype.hasOwnProperty.call(updatedDocs, path)) continue;
         const partData = this.converter.convertedXml[path] as { elements?: unknown[] } | undefined;
         if (partData?.elements?.[0]) {

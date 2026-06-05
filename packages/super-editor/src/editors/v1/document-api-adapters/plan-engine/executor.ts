@@ -998,6 +998,13 @@ export function executeTextRewrite(
         tr.replaceWith(remap(change.docFrom), remap(change.docTo), content);
       }
     }
+  } else if (trimmedNew.length === 0) {
+    // Pure deletion after trimming: a non-empty replacement whose new text is
+    // fully contained in the old text's common prefix + suffix collapses to an
+    // empty delta (e.g. "best endeavours to:" → "endeavours to:" leaves
+    // trimmedNew === ""). Delete the removed range rather than building
+    // schema.text('') — ProseMirror rejects empty text nodes.
+    tr.delete(trimmedFrom, trimmedTo);
   } else {
     // 0 or 1 word change: replace just the trimmed range.
     const content = buildTextWithTabs(editor.state.schema, trimmedNew, asProseMirrorMarks(marks));
@@ -2380,7 +2387,9 @@ export function executePlan(editor: Editor, input: MutationsApplyInput): PlanRec
     throw planError('INVALID_INPUT', 'plan must contain at least one step');
   }
 
-  const compiled = compilePlan(editor, input.steps);
+  const compiled = compilePlan(editor, input.steps, {
+    selectTextModel: input.changeMode === 'tracked' ? 'raw' : 'visible',
+  });
 
   return executeCompiledPlan(editor, compiled, {
     changeMode: input.changeMode ?? 'direct',

@@ -1,14 +1,14 @@
 {
   "generatedAt": "2026-05-19T11:33:50.546Z",
   "summary": {
-    "total": 214,
+    "total": 226,
     "byBucket": {
       "legacy-root": 60,
       "internal-candidate": 8,
-      "supported-root": 146
+      "supported-root": 158
     },
     "byConfidence": {
-      "high": 111,
+      "high": 123,
       "medium": 101,
       "low": 2
     }
@@ -807,10 +807,87 @@
       "inCjs": false
     },
     {
+      "name": "FontAssetUrlContext",
+      "bucket": "supported-root",
+      "rationale": "Context passed to the public FontsConfig.resolveAssetUrl resolver.",
+      "confidence": "high",
+      "source": "config-supported",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
+      "name": "FontAssetUrlResolver",
+      "bucket": "supported-root",
+      "rationale": "Type of the public FontsConfig.resolveAssetUrl hook.",
+      "confidence": "high",
+      "source": "config-supported",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
       "name": "FontConfig",
       "bucket": "supported-root",
       "rationale": "Configuration type for a supported feature.",
       "confidence": "medium",
+      "source": "config-supported",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
+      "name": "FontFaceConfig",
+      "bucket": "supported-root",
+      "rationale": "Public URL-backed font-face shape used by FontsConfig.families and superdoc.fonts.add.",
+      "confidence": "high",
+      "source": "config-supported",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
+      "name": "FontFamilyConfig",
+      "bucket": "supported-root",
+      "rationale": "Public font-family shape used by FontsConfig.families and superdoc.fonts.add.",
+      "confidence": "high",
+      "source": "config-supported",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
+      "name": "FontResolutionRecord",
+      "bucket": "supported-root",
+      "rationale": "Per-font logical-to-physical resolution record returned by superdoc.fonts.getReport().",
+      "confidence": "high",
+      "source": "locked",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
+      "name": "FontsChangedPayload",
+      "bucket": "supported-root",
+      "rationale": "Payload of the public fonts-changed event / onFontsChanged callback and fonts.onReport.",
+      "confidence": "high",
+      "source": "locked",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
+      "name": "FontsConfig",
+      "bucket": "supported-root",
+      "rationale": "Consumer fonts configuration (custom families, logical mappings, and bundled asset URL hooks); part of the public SuperDoc Config.",
+      "confidence": "high",
       "source": "config-supported",
       "inDts": true,
       "inDcts": true,
@@ -1764,6 +1841,39 @@
       "inCjs": false
     },
     {
+      "name": "SuperDocFontFace",
+      "bucket": "supported-root",
+      "rationale": "Public font-face shape for superdoc.fonts.add (URL source + optional weight/style).",
+      "confidence": "high",
+      "source": "locked",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
+      "name": "SuperDocFontFamily",
+      "bucket": "supported-root",
+      "rationale": "Public font-family shape for superdoc.fonts.add (family name + faces).",
+      "confidence": "high",
+      "source": "locked",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
+      "name": "SuperDocFontsApi",
+      "bucket": "supported-root",
+      "rationale": "Return type of the public superdoc.fonts read + write surface (getReport/getMissingFonts/getDocumentFonts/onReport + map/unmap/add/preload).",
+      "confidence": "high",
+      "source": "locked",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
       "name": "SuperDocLayoutEngineOptions",
       "bucket": "supported-root",
       "rationale": "Types Config.layoutEngineOptions at core/types/index.ts:1350,1505. Documented Config field.",
@@ -2004,6 +2114,28 @@
       "inDcts": true,
       "inEsm": true,
       "inCjs": true
+    },
+    {
+      "name": "TrackChangeAuthor",
+      "bucket": "supported-root",
+      "rationale": "Structured author identity passed to modules.trackChanges.authorColors.resolve.",
+      "confidence": "high",
+      "source": "locked",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
+    },
+    {
+      "name": "TrackChangesAuthorColorsConfig",
+      "bucket": "supported-root",
+      "rationale": "Module config for per-author tracked-change colors (modules.trackChanges.authorColors). Documented at the module-config layer.",
+      "confidence": "high",
+      "source": "locked",
+      "inDts": true,
+      "inDcts": true,
+      "inEsm": false,
+      "inCjs": false
     },
     {
       "name": "TrackChangesBasePluginKey",

@@ -59,6 +59,17 @@ describe('resolveTrackedChangeType', () => {
   it('returns replacement when both hasInsert and hasDelete are true (no format)', () => {
     expect(resolveTrackedChangeType({ hasInsert: true, hasDelete: true, hasFormat: false })).toBe('replacement');
   });
+
+  it('keeps whole-table revisions structural internally', () => {
+    expect(
+      resolveTrackedChangeType({
+        hasInsert: false,
+        hasDelete: false,
+        hasFormat: false,
+        structural: { side: 'insertion', subtype: 'table-insert' },
+      }),
+    ).toBe('structural');
+  });
 });
 
 describe('groupTrackedChanges', () => {
@@ -267,6 +278,22 @@ describe('groupTrackedChanges', () => {
 
     const grouped = groupTrackedChanges(makeEditor());
     expect(grouped[0]?.excerpt).toBe('O ');
+  });
+
+  it('does not duplicate excerpt text for overlapping imported format marks', () => {
+    const mark = makeTrackMark(TrackFormatMarkName, 'format', { sourceId: '1' });
+    vi.mocked(getTrackChanges).mockReturnValue([
+      { ...mark, node: { text: 'Format ', marks: [mark.mark] }, from: 2, to: 9 },
+      { ...mark, from: 1, to: 10 },
+    ] as never);
+
+    const editor = makeEditor();
+    vi.mocked(editor.state.doc.textBetween).mockReturnValue('Format ');
+
+    const grouped = groupTrackedChanges(editor);
+
+    expect(grouped[0]?.rawId).toBe(`word:${TrackFormatMarkName}:1`);
+    expect(grouped[0]?.excerpt).toBe('Format ');
   });
 
   it('sorts results by from position', () => {

@@ -85,7 +85,14 @@ import type {
   FindReplaceResolution,
   FlowBlock,
   FlowMode,
+  FontAssetUrlContext,
+  FontAssetUrlResolver,
   FontConfig,
+  FontFaceConfig,
+  FontFamilyConfig,
+  FontResolutionRecord,
+  FontsChangedPayload,
+  FontsConfig,
   FontsResolvedPayload,
   ImageDeselectedEvent,
   ImageSelectedEvent,
@@ -167,6 +174,9 @@ import type {
   SuperDocExceptionPayload,
   SuperDocExceptionRestorePayload,
   SuperDocExceptionStorePayload,
+  SuperDocFontFace,
+  SuperDocFontFamily,
+  SuperDocFontsApi,
   SuperDocLayoutEngineOptions,
   SuperDocLockedPayload,
   SuperDocReadyPayload,
@@ -185,6 +195,8 @@ import type {
   TextAddress,
   TextSegment,
   TextTarget,
+  TrackChangeAuthor,
+  TrackChangesAuthorColorsConfig,
   TrackChangesModuleConfig,
   TrackedChangeAddress,
   TrackedChangesMode,
@@ -267,7 +279,14 @@ const _real_FindReplaceRenderContext: AssertNotAny<FindReplaceRenderContext> = t
 const _real_FindReplaceResolution: AssertNotAny<FindReplaceResolution> = true;
 const _real_FlowBlock: AssertNotAny<FlowBlock> = true;
 const _real_FlowMode: AssertNotAny<FlowMode> = true;
+const _real_FontAssetUrlContext: AssertNotAny<FontAssetUrlContext> = true;
+const _real_FontAssetUrlResolver: AssertNotAny<FontAssetUrlResolver> = true;
 const _real_FontConfig: AssertNotAny<FontConfig> = true;
+const _real_FontFaceConfig: AssertNotAny<FontFaceConfig> = true;
+const _real_FontFamilyConfig: AssertNotAny<FontFamilyConfig> = true;
+const _real_FontResolutionRecord: AssertNotAny<FontResolutionRecord> = true;
+const _real_FontsChangedPayload: AssertNotAny<FontsChangedPayload> = true;
+const _real_FontsConfig: AssertNotAny<FontsConfig> = true;
 const _real_FontsResolvedPayload: AssertNotAny<FontsResolvedPayload> = true;
 const _real_ImageDeselectedEvent: AssertNotAny<ImageDeselectedEvent> = true;
 const _real_ImageSelectedEvent: AssertNotAny<ImageSelectedEvent> = true;
@@ -349,6 +368,9 @@ const _real_SuperDocExceptionEditorPayload: AssertNotAny<SuperDocExceptionEditor
 const _real_SuperDocExceptionPayload: AssertNotAny<SuperDocExceptionPayload> = true;
 const _real_SuperDocExceptionRestorePayload: AssertNotAny<SuperDocExceptionRestorePayload> = true;
 const _real_SuperDocExceptionStorePayload: AssertNotAny<SuperDocExceptionStorePayload> = true;
+const _real_SuperDocFontFace: AssertNotAny<SuperDocFontFace> = true;
+const _real_SuperDocFontFamily: AssertNotAny<SuperDocFontFamily> = true;
+const _real_SuperDocFontsApi: AssertNotAny<SuperDocFontsApi> = true;
 const _real_SuperDocLayoutEngineOptions: AssertNotAny<SuperDocLayoutEngineOptions> = true;
 const _real_SuperDocLockedPayload: AssertNotAny<SuperDocLockedPayload> = true;
 const _real_SuperDocReadyPayload: AssertNotAny<SuperDocReadyPayload> = true;
@@ -367,6 +389,8 @@ const _real_TelemetryEvent: AssertNotAny<TelemetryEvent> = true;
 const _real_TextAddress: AssertNotAny<TextAddress> = true;
 const _real_TextSegment: AssertNotAny<TextSegment> = true;
 const _real_TextTarget: AssertNotAny<TextTarget> = true;
+const _real_TrackChangeAuthor: AssertNotAny<TrackChangeAuthor> = true;
+const _real_TrackChangesAuthorColorsConfig: AssertNotAny<TrackChangesAuthorColorsConfig> = true;
 const _real_TrackChangesModuleConfig: AssertNotAny<TrackChangesModuleConfig> = true;
 const _real_TrackedChangeAddress: AssertNotAny<TrackedChangeAddress> = true;
 const _real_TrackedChangesMode: AssertNotAny<TrackedChangesMode> = true;
