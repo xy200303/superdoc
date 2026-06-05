@@ -2748,4 +2748,155 @@ describe('tableCellNodeToBlock — SD-2516: documentPartObject children', () => 
       expect(result?.attrs?.tableDirectionContext?.parentSection).toBe(customSectionContext);
     });
   });
+
+  describe('structural row tracked changes', () => {
+    const ROW_TRACK_CONFIG: TrackedChangesConfig = { enabled: true, mode: 'review' };
+
+    const buildTrackedRowTable = (trackChange: Record<string, unknown> | null): PMNode => ({
+      type: 'table',
+      content: [
+        {
+          type: 'tableRow',
+          attrs: trackChange ? { trackChange } : {},
+          content: [
+            {
+              type: 'tableCell',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Cell' }] }],
+            },
+          ],
+        },
+      ],
+    });
+
+    it('produces attrs.trackedChange with kind "insert" for a rowInsert row', () => {
+      const result = tableNodeToBlock(
+        buildTrackedRowTable({
+          type: 'rowInsert',
+          id: 'rev-1',
+          author: 'Alice',
+          authorEmail: 'alice@example.com',
+          date: '2024-01-01T00:00:00Z',
+        }),
+        mockBlockIdGenerator,
+        mockPositionMap,
+        'Arial',
+        16,
+        ROW_TRACK_CONFIG,
+        undefined,
+        undefined,
+        undefined,
+        mockParagraphConverter,
+      ) as TableBlock;
+
+      const meta = result.rows[0].attrs?.trackedChange;
+      expect(meta).toBeDefined();
+      expect(meta?.kind).toBe('insert');
+      expect(meta?.id).toBe('rev-1');
+      expect(meta?.author).toBe('Alice');
+      expect(meta?.authorEmail).toBe('alice@example.com');
+      expect(meta?.date).toBe('2024-01-01T00:00:00Z');
+      // Color is stamped downstream, never by the adapter.
+      expect(meta?.color).toBeUndefined();
+    });
+
+    it('produces attrs.trackedChange with kind "delete" for a rowDelete row', () => {
+      const result = tableNodeToBlock(
+        buildTrackedRowTable({ type: 'rowDelete', id: 'rev-2', author: 'Bob' }),
+        mockBlockIdGenerator,
+        mockPositionMap,
+        'Arial',
+        16,
+        ROW_TRACK_CONFIG,
+        undefined,
+        undefined,
+        undefined,
+        mockParagraphConverter,
+      ) as TableBlock;
+
+      const meta = result.rows[0].attrs?.trackedChange;
+      expect(meta?.kind).toBe('delete');
+      expect(meta?.id).toBe('rev-2');
+    });
+
+    it('omits attrs.trackedChange for an untracked row', () => {
+      const result = tableNodeToBlock(
+        buildTrackedRowTable(null),
+        mockBlockIdGenerator,
+        mockPositionMap,
+        'Arial',
+        16,
+        ROW_TRACK_CONFIG,
+        undefined,
+        undefined,
+        undefined,
+        mockParagraphConverter,
+      ) as TableBlock;
+
+      expect(result.rows[0].attrs?.trackedChange).toBeUndefined();
+    });
+
+    it('omits attrs.trackedChange when tracked changes are disabled', () => {
+      const result = tableNodeToBlock(
+        buildTrackedRowTable({ type: 'rowInsert', id: 'rev-3' }),
+        mockBlockIdGenerator,
+        mockPositionMap,
+        'Arial',
+        16,
+        { enabled: false, mode: 'review' },
+        undefined,
+        undefined,
+        undefined,
+        mockParagraphConverter,
+      ) as TableBlock;
+
+      expect(result.rows[0].attrs?.trackedChange).toBeUndefined();
+    });
+
+    // View-mode hiding: a hidden tracked row must be dropped from the layout
+    // entirely (not just CSS-hidden in the painter) so it reserves no blank
+    // table space. When every row is hidden the whole table block is omitted.
+    const buildTable = (node: PMNode, config: TrackedChangesConfig) =>
+      tableNodeToBlock(
+        node,
+        mockBlockIdGenerator,
+        mockPositionMap,
+        'Arial',
+        16,
+        config,
+        undefined,
+        undefined,
+        undefined,
+        mockParagraphConverter,
+      ) as TableBlock | null;
+
+    it('omits an inserted row in "original" mode (whole single-row table dropped)', () => {
+      const result = buildTable(buildTrackedRowTable({ type: 'rowInsert', id: 'r1' }), {
+        enabled: true,
+        mode: 'original',
+      });
+      expect(result).toBeNull();
+    });
+
+    it('omits a deleted row in "final" mode (whole single-row table dropped)', () => {
+      const result = buildTable(buildTrackedRowTable({ type: 'rowDelete', id: 'r1' }), {
+        enabled: true,
+        mode: 'final',
+      });
+      expect(result).toBeNull();
+    });
+
+    it('keeps a deleted row in "original" mode and an inserted row in "final" mode', () => {
+      const del = buildTable(buildTrackedRowTable({ type: 'rowDelete', id: 'r1' }), {
+        enabled: true,
+        mode: 'original',
+      });
+      expect(del?.rows).toHaveLength(1);
+
+      const ins = buildTable(buildTrackedRowTable({ type: 'rowInsert', id: 'r1' }), {
+        enabled: true,
+        mode: 'final',
+      });
+      expect(ins?.rows).toHaveLength(1);
+    });
+  });
 });
