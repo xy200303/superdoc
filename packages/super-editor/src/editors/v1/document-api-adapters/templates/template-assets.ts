@@ -133,8 +133,9 @@ export function importHeaderFooterAssets(
   const srcRelEls = srcRelsRoot?.elements ?? [];
 
   // Detect every header/footer part present in the source (even if the page-1
-  // governing section does not reference it), then attach a representative
-  // source rel id when one exists so the selected sectPr can be rewired.
+  // governing section does not reference it), then collect every source
+  // document-rel id that targets that part so the adopted sectPr can rewrite
+  // all references coherently.
   const hfPartNames = [...byName.keys()].filter((n) => /^word\/(header|footer)\d+\.xml$/.test(n)).sort();
   if (hfPartNames.length === 0) return result;
   result.detected = true;
@@ -218,15 +219,18 @@ export function importHeaderFooterAssets(
     return allocated;
   };
 
-  // Build a quick lookup of source document rels by target part name.
-  const sourceRelByTarget = new Map<string, { id: string; type: string }>();
+  // Build a quick lookup of source document rel ids by target part name.
+  const sourceRelIdsByTarget = new Map<string, string[]>();
   for (const rel of srcRelEls) {
     const type = rel.attributes?.Type;
     const target = rel.attributes?.Target;
     const id = rel.attributes?.Id;
     if (!type || !target || !id) continue;
     if (type === HEADER_REL_TYPE || type === FOOTER_REL_TYPE) {
-      sourceRelByTarget.set(relTargetToWordPath(target).replace(/^word\//, ''), { id, type });
+      const sourceTarget = relTargetToWordPath(target).replace(/^word\//, '');
+      const existing = sourceRelIdsByTarget.get(sourceTarget);
+      if (existing) existing.push(id);
+      else sourceRelIdsByTarget.set(sourceTarget, [id]);
     }
   }
 
@@ -321,11 +325,11 @@ export function importHeaderFooterAssets(
     });
     docRelsChanged = true;
 
-    // Map the source document-rel id (if this part was referenced) to the new id.
-    const srcRel = sourceRelByTarget.get(sourceTarget);
-    if (srcRel) {
-      result.relIdRemap.set(srcRel.id, relId);
-      result.mappings.push({ kind: 'relationship', from: srcRel.id, to: relId });
+    // Map every source document-rel id that referenced this part to the new id.
+    const sourceRelIds = sourceRelIdsByTarget.get(sourceTarget) ?? [];
+    for (const sourceRelId of sourceRelIds) {
+      result.relIdRemap.set(sourceRelId, relId);
+      result.mappings.push({ kind: 'relationship', from: sourceRelId, to: relId });
     }
 
     // Content-type override.
