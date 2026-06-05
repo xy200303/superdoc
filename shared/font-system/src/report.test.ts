@@ -107,6 +107,14 @@ class FaceRegistry {
     this.registered.add(this.#key(family, weight, style));
     this.faceStatuses.set(this.#key(family, weight, style), status);
   }
+  setAwaitedFaceStatus(
+    family: string,
+    weight: '400' | '700',
+    style: 'normal' | 'italic',
+    status: FontLoadStatus,
+  ): void {
+    this.faceStatuses.set(this.#key(family, weight, style), status);
+  }
   asRegistry(): FontRegistry {
     return this as unknown as FontRegistry;
   }
@@ -120,7 +128,7 @@ describe('buildFaceReport (face-level)', () => {
     // unregistered family can never report `loaded` (document.fonts.load resolves only registered
     // faces, not system fonts), so in production it settles to `fallback_used` - model that, not the
     // prior unrealistic `unloaded`.
-    reg.setFace('Georgia', '700', 'normal', 'fallback_used');
+    reg.setAwaitedFaceStatus('Georgia', '700', 'normal', 'fallback_used');
     const resolver = createFontResolver();
     resolver.map('Georgia', 'Gelasio');
     const rows = buildFaceReport(
